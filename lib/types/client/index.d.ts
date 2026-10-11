@@ -1,7 +1,7 @@
 /**
  * dsh-ocgo-usage browser half — registers the OpenCode Go usage chip into
- * the composer tool row (`conversation.input.right`, next to the model
- * selector) and reads the host's same-origin `/api/ocgo-usage` JSON endpoints:
+ * the composer dock (`conversation.composer.dock`, above the input) and reads
+ * the host's same-origin `/api/ocgo-usage` JSON endpoints:
  * poll the host snapshot (every 10 s),
  * refresh on demand. The chip shows the three usage windows (rolling 5h /
  * weekly / monthly) in a compact form; while the host reports no usable data
@@ -9,15 +9,13 @@
  * `<err:code>` state with a manual refresh action.
  *
  * Provider visibility is decided CLIENT-side from the live model selection:
- * `session.models` reads the in-memory current selection (2-3 ms warm, no
- * network), so switching models via `/model` is reflected on the very next
- * poll — the host's request-header fold lags until the next real request,
- * which is why visibility does not ride the usage endpoint. The chip renders
- * nothing while the current provider is not `opencode-go`, mirroring
+ * The shared model directory reads the Session's live selection projection,
+ * so model changes are reflected on the next poll without a model-list RPC.
+ * The chip renders nothing while the current provider is not `opencode-go`, mirroring
  * pi-ocgo-usage.
  * @module dsh-ocgo-usage/client
  */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client';
+import type { Context as ClientContext } from '@deepseek-ai/cordis';
 import { type OcgoKey } from './locales.ts';
 export { OCGO_PROVIDER } from '../provider.ts';
 export { OcgoDockEntry, formatDuration } from './OcgoDockEntry.tsx';
@@ -36,13 +34,13 @@ export interface OcgoInjected {
     dockSessionId: string | undefined;
     /**
      * Resolve the CURRENT model provider of the dock's session from the live
-     * in-memory selection (`session.models`, warm ~ms). Undefined when the
+     * shared model-directory snapshot. Undefined when the
      * session has no selection yet.
      */
     provider(): Promise<string | undefined>;
 }
 /**
- * Register the usage chip into the composer tool row next to the model selector.
+ * Register the usage chip into the composer dock above the input.
  * @param ctx - client root context.
  */
 export declare function apply(ctx: ClientContext): void;

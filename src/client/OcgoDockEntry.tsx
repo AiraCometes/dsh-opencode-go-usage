@@ -1,6 +1,6 @@
 /**
  * The composer tool-row entry: the OpenCode Go usage readout, mounted in the
- * composer tool row (`conversation.input.right`) next to the model selector.
+ * composer tool row (`conversation.composer.dock`) above the input.
  * The chip polls the host `/api/ocgo-usage` endpoint for the three usage
  * windows (rolling 5h / weekly / monthly);
  * clicking reveals per-window reset countdowns, a Set editor (masked
@@ -49,7 +49,7 @@ const ocgoApi = {
 
 /** Composed props of the dock entry (runtime + locale + injected session/provider face). */
 export type OcgoDockEntryProps =
-  PropsRuntime<'conversation.input.right'>
+  PropsRuntime<'conversation.composer.dock'>
   & PropsLocale<typeof NS>
   & { dockSessionId?: string | undefined; provider?: () => Promise<string | undefined> }
 
@@ -188,7 +188,7 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
 
   // One periodic tick:
   //   1. resolve the session's CURRENT provider from the live in-memory
-  //      selection (session.models, warm ~ms) and toggle `visible`;
+  //      selection (shared model-directory snapshot) and toggle `visible`;
   //   2. only while visible, fetch the usage snapshot.
   const pollNow = useCallback(() => {
     let live = true
