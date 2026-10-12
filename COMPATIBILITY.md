@@ -39,3 +39,9 @@ installation; these checks do not verify an OpenCode account session.
 ## New conversation visibility
 
 The usage entry registers in `conversation.input.right`, which the Harness renders for a selected session in both the new-conversation hero and the ongoing conversation. `conversation.composer.dock` only renders when the composer variant is `composer`; using it hides the entry on the hero even when OpenCode Go is selected. No API credentials are required to show the entry: missing usage configuration produces `<err:noconfig>`.
+
+## Narrow input toolbars
+
+At toolbar container widths up to 560px, the usage button shows only the OpenCode Go logo; click it to open all usage windows. Wider toolbars retain the inline readout. Error and unavailable states also collapse, with accessible button labels retained. The query uses the Harness toolbar's existing inline-size container, so it also applies to a narrow center pane in a wide browser window.
+
+A local Edge fixture using the built browser bundle and Harness InputBar CSS verified send-button containment at toolbar widths of 240, 320, 560 and 800px. With all three windows at 100%, the chip measured 36px in the narrow layouts and approximately 243px at 800px. The compact button opened all three detail windows; error and unavailable buttons also measured 36px. This fixture does not replace validation in an authenticated Harness session.

@@ -35,6 +35,13 @@ describe('rendered usage entry', () => {
     await mount()
     expect(container.querySelector('[data-testid="ocgo-chip"]')).not.toBeNull()
     expect(container.textContent).toContain('23%')
+    expect(container.querySelector('button')?.getAttribute('aria-label')).toBe('5h 23%')
+  })
+  it('opens usage details from the compact button', async () => {
+    await mount()
+    await act(async () => { container.querySelector('button')?.click() })
+    expect(container.textContent).toContain('ocgo.resetsIn')
+    expect(container.textContent).toContain('ocgo.rolling')
   })
   it('hides other providers and returns after switching back', async () => {
     await mount()
@@ -49,5 +56,6 @@ describe('rendered usage entry', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ error: 'noconfig' }) })))
     await mount()
     expect(container.textContent).toContain('<err:noconfig>')
+    expect(container.querySelector('button')?.getAttribute('aria-label')).toContain('ocgo.set')
   })
 })

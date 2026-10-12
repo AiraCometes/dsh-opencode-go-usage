@@ -333,9 +333,10 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
           type="button"
           className={open ? `${css.chip} ${css.chipOpen}` : css.chip}
           onClick={() => { if (open) closePanel(); else openSet() }}
+          aria-label={`${error.message} — ${t('ocgo.set')}`}
           title={`${error.message}\n${t('ocgo.set')}`}
         >
-          <OcgoLogo /> &lt;err:{error.code}&gt;
+          <OcgoLogo /> <span className={css.summary}>&lt;err:{error.code}&gt;</span>
         </button>
         {open && (
           <span className={css.details}>
@@ -393,9 +394,10 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
         className={css.chip}
         onClick={refresh}
         title={t('ocgo.refresh')}
+        aria-label={t('ocgo.unavailable')}
         data-testid="ocgo-chip-empty"
       >
-        <OcgoLogo /> {t('ocgo.unavailable')}
+        <OcgoLogo /> <span className={css.summary}>{t('ocgo.unavailable')}</span>
       </button>
     )
   }
@@ -406,6 +408,7 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
         type="button"
         className={open ? `${css.chip} ${css.chipOpen}` : css.chip}
         onClick={() => { if (open) closePanel(); else setOpen(true) }}
+        aria-label={windows.map((w) => `${WINDOW_LABELS[w.kind]} ${w.percent}%`).join(', ')}
         title={open ? t('ocgo.collapse') : t('ocgo.expand')}
       >
         <OcgoLogo />

@@ -219,3 +219,14 @@
   max-width: 240px;
   white-space: normal;
 }
+
+/* InputBar's toolbar is an anonymous inline-size container. Collapse the
+   readout when its available width is narrow, including narrow center panes
+   in otherwise wide windows. Keep the logo button and its detail panel. */
+@container (max-width: 560px) {
+  .seg,
+  .chevron,
+  .summary {
+    display: none;
+  }
+}
