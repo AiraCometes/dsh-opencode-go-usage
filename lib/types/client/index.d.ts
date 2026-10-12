@@ -1,6 +1,6 @@
 /**
  * dsh-ocgo-usage browser half — registers the OpenCode Go usage chip into
- * the composer dock (`conversation.composer.dock`, above the input) and reads
+ * the input toolbar (`conversation.input.right`) and reads
  * the host's same-origin `/api/ocgo-usage` JSON endpoints:
  * poll the host snapshot (every 10 s),
  * refresh on demand. The chip shows the three usage windows (rolling 5h /
@@ -40,7 +40,7 @@ export interface OcgoInjected {
     provider(): Promise<string | undefined>;
 }
 /**
- * Register the usage chip into the composer dock above the input.
+ * Register the usage chip into the input toolbar.
  * @param ctx - client root context.
  */
 export declare function apply(ctx: ClientContext): void;

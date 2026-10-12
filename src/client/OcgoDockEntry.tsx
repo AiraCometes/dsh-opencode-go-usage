@@ -1,6 +1,6 @@
 /**
  * The composer tool-row entry: the OpenCode Go usage readout, mounted in the
- * composer tool row (`conversation.composer.dock`) above the input.
+ * composer tool row (`conversation.input.right`) in the input toolbar.
  * The chip polls the host `/api/ocgo-usage` endpoint for the three usage
  * windows (rolling 5h / weekly / monthly);
  * clicking reveals per-window reset countdowns, a Set editor (masked
@@ -49,7 +49,7 @@ const ocgoApi = {
 
 /** Composed props of the dock entry (runtime + locale + injected session/provider face). */
 export type OcgoDockEntryProps =
-  PropsRuntime<'conversation.composer.dock'>
+  PropsRuntime<'conversation.input.right'>
   & PropsLocale<typeof NS>
   & { dockSessionId?: string | undefined; provider?: () => Promise<string | undefined> }
 
