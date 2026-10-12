@@ -1,5 +1,7 @@
 # dsh-opencode-go-usage
 
+> Compatibility fork for DeepSeek Harness 0.2.1-alpha.2: see [COMPATIBILITY.md](COMPATIBILITY.md).
+
 English | [中文](README.md)
 
 [![npm](https://img.shields.io/npm/v/dsh-ocgo-usage)](https://www.npmjs.com/package/dsh-ocgo-usage)
