@@ -23,11 +23,11 @@ function harness() {
 }
 
 describe('current Harness model directory integration', () => {
-  it('registers the composer dock through its owner lifecycle', () => {
+  it('registers the input toolbar through its owner lifecycle', () => {
     const h = harness()
     expect(h.inject.mock.calls[0]?.[0]).toEqual(['slots', 'modelDirectories'])
-    expect(h.slotInject.mock.calls[0]?.[0]).toBe('conversation.composer.dock')
-    expect(h.entry().name).toBe('conversation.composer.dock')
+    expect(h.slotInject.mock.calls[0]?.[0]).toBe('conversation.input.right')
+    expect(h.entry().name).toBe('conversation.input.right')
   })
   it('reads the current provider without the removed connection API', async () => {
     const h = harness(); h.current.set('example', { provider: 'opencode-go' })

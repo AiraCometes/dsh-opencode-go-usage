@@ -15,7 +15,7 @@ let entry
 let provider = 'opencode-go'
 const scope = {
   slots: {
-    inject(name, callback) { assert.equal(name, 'conversation.composer.dock'); return callback() },
+    inject(name, callback) { assert.equal(name, 'conversation.input.right'); return callback() },
     register(options) { entry = options; return () => {} },
   },
   modelDirectories: { directoryFor() {
@@ -30,7 +30,7 @@ client.apply({
     callback(scope)
   },
 })
-assert.equal(entry.name, 'conversation.composer.dock')
+assert.equal(entry.name, 'conversation.input.right')
 const injected = entry.inject('example')
 assert.equal(await injected.provider(), 'opencode-go')
 provider = 'deepseek'
