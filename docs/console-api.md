@@ -33,3 +33,5 @@ Workspace IDs from config and environment are trimmed. A legacy `wrk_…` reject
 Error and redirect response bodies are canceled before returning their HTTP error. Legacy SSR parsing exports are deprecated but retained to avoid breaking unknown external imports. They are not used by the active transport.
 
 The review-update tarball was also installed into a fresh npm DSH rc.2 profile. A real POST to the plugin config API rejected a legacy `auth` cookie with HTTP 400 and preserved the saved file byte-for-byte, including when another field was included in the invalid write. A locale-first bare Console token was then accepted and saved in canonical form. Only synthetic credentials were used; the temporary server was stopped.
+
+Save feedback is covered in both the usage-details and error-chip editors: Save, outside pointer press and Escape wait for the write result. A rejected write keeps the editor and entered values visible with a localized error. A corrected retry closes only after success. Pending writes disable inputs and ignore additional close/save attempts, preventing duplicate submissions. Network failure follows the same recovery path.

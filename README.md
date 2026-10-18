@@ -57,8 +57,8 @@ dsh plugin --profile web add 'github:AiraCometes/dsh-opencode-go-usage#main'
 ### 从 tarball 安装
 
 ```sh
-pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.4-rc.2.1.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.4-rc.2.1.tgz
+pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.4-rc.2.2.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.4-rc.2.2.tgz
 ```
 
 ### 本地开发安装
@@ -90,7 +90,7 @@ dsh --profile web --dump-config   # 应显示 "# == dsh-ocgo-usage" 层
 
 ### 方式一：界面内 Set 面板（最简单）
 
-点击 chip 展开详情 → 左下角 `Set` → 输入 workspace id 与 cookie（已设置的值以 `••••` + 末尾 4 位显示，聚焦即可输入新值）→ 点击外部 / Esc / 保存按钮确认，立即生效。
+点击 chip 展开详情 → 左下角 `Set` → 输入 workspace id 与 cookie（已设置的值以 `••••` + 末尾 4 位显示，聚焦即可输入新值）→ 点击外部 / Esc / 保存按钮确认；保存成功后立即生效。保存失败时保留面板和输入内容并显示错误，可修正 Console cookie 后重试。保存期间输入暂时禁用。
 
 ![Set editor](assets/set-cookie-wid.png)
 

@@ -58,8 +58,8 @@ npm does not change the plugin installation command.
 ### From a tarball
 
 ```sh
-pnpm pack            # in this repo → dsh-ocgo-usage-0.1.4-rc.2.1.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.4-rc.2.1.tgz
+pnpm pack            # in this repo → dsh-ocgo-usage-0.1.4-rc.2.2.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.4-rc.2.2.tgz
 ```
 
 ### From a local checkout (development)
@@ -91,7 +91,7 @@ The `workspaceID` setting and environment variable retain their existing names a
 
 ### Option 1: the in-UI Set panel (easiest)
 
-Click the chip to expand → `Set` (bottom-left) → type the workspace id and cookie (existing values show as `••••` + last 4 chars; focus a field to type a replacement) → click outside / press Esc / hit Save — it takes effect immediately.
+Click the chip to expand → `Set` (bottom-left) → type the workspace id and cookie (existing values show as `••••` + last 4 chars; focus a field to type a replacement) → click outside / press Esc / hit Save — successful saves take effect immediately. If saving fails, the editor stays open with the draft and an error message; correct the Console cookie and retry. Inputs are disabled while a write is pending.
 
 ![Set editor](assets/set-cookie-wid.png)
 

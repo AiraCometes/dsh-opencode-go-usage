@@ -21,6 +21,7 @@ export declare const zh: {
     readonly 'ocgo.sep': "·";
     readonly 'ocgo.set': "设置";
     readonly 'ocgo.save': "保存";
+    readonly 'ocgo.saveFailed': "保存失败。请使用 Console 的 __Host-console_session cookie，然后重试。";
     readonly 'ocgo.workspaceID': "工作区 / 组织 ID";
     readonly 'ocgo.cookie': "Console 会话 cookie";
     readonly 'ocgo.setHint': "点击外部或按 Esc 保存";
@@ -42,6 +43,7 @@ export declare const en: {
     readonly 'ocgo.sep': "·";
     readonly 'ocgo.set': "Set";
     readonly 'ocgo.save': "Save";
+    readonly 'ocgo.saveFailed': "Could not save. Use the Console __Host-console_session cookie and try again.";
     readonly 'ocgo.workspaceID': "workspace / organization id";
     readonly 'ocgo.cookie': "Console session cookie";
     readonly 'ocgo.setHint': "click outside or press Esc to save";

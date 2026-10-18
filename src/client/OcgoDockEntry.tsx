@@ -178,6 +178,9 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
   const [config, setConfig] = useState<MaskedConfigView | null>(null)
   const [wsDraft, setWsDraft] = useState('')
   const [cookieDraft, setCookieDraft] = useState('')
+  const [saveFailed, setSaveFailed] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const wrapRef = useRef<HTMLSpanElement>(null)
   const modeRef = useRef<'view' | 'set'>('view')
   modeRef.current = mode
@@ -242,8 +245,8 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
     })
   }, [])
 
-  /** Submit any edited field; returns the write promise (fire-and-forget on blur). */
-  const saveConfig = useCallback((): void => {
+  /** Resolve true only when edits are saved (or no edits need writing). */
+  const saveConfig = useCallback(async (): Promise<boolean> => {
     const current = configRef.current
     const partial: { cookie?: string; workspaceID?: string } = {}
     if (current !== null) {
@@ -256,27 +259,46 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
       if (draftsRef.current.ws.trim().length > 0) partial.workspaceID = draftsRef.current.ws.trim()
       if (draftsRef.current.cookie.trim().length > 0) partial.cookie = draftsRef.current.cookie.trim()
     }
-    if (Object.keys(partial).length === 0) return
-    ocgoApi.writeConfig(partial).then((snapshot) => {
+    if (Object.keys(partial).length === 0) return true
+    try {
+      const snapshot = await ocgoApi.writeConfig(partial)
       setConfig(snapshot)
       setWsDraft(maskedText(snapshot.workspaceID))
       setCookieDraft(maskedText(snapshot.cookie))
       // New credentials are live now (host invalidated its cache): poll now.
       pollNow()
-    }, () => {
-      // Ignore; the next poll resyncs and the editor keeps the drafts.
-    })
+      return true
+    } catch {
+      return false
+    }
   }, [pollNow])
 
   /** Close the panel; in set mode a blur/close acts as confirm (save). */
   const closePanel = useCallback((): void => {
-    if (modeRef.current === 'set') saveConfig()
-    setOpen(false)
-    setMode('view')
+    if (savingRef.current) return
+    if (modeRef.current !== 'set') {
+      setOpen(false)
+      return
+    }
+    savingRef.current = true
+    setSaving(true)
+    setSaveFailed(false)
+    void saveConfig().then((saved) => {
+      if (saved) {
+        setOpen(false)
+        setMode('view')
+      } else {
+        setSaveFailed(true)
+      }
+    }).finally(() => {
+      savingRef.current = false
+      setSaving(false)
+    })
   }, [saveConfig])
 
   /** Open the editor (used by the Set button and the error chip). */
   const openSet = useCallback((): void => {
+    setSaveFailed(false)
     setMode('set')
     setOpen(true)
     loadConfig()
@@ -340,16 +362,17 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
         </button>
         {open && (
           <span className={css.details}>
-            <span className={css.setPanel}>
+            <span className={css.setPanel} aria-busy={saving}>
               <label className={css.field}>
                 <span className={css.fieldLabel}>{t('ocgo.workspaceID')}</span>
                 <input
                   className={css.fieldInput}
                   value={wsDraft}
+                  disabled={saving}
                   placeholder="org_…"
                   spellCheck={false}
                   autoComplete="off"
-                  onChange={(e) => { setWsDraft(e.target.value) }}
+                  onChange={(e) => { setWsDraft(e.target.value); setSaveFailed(false) }}
                   onFocus={(e) => { if (e.target.value === maskedText(config?.workspaceID)) e.target.select() }}
                 />
               </label>
@@ -358,16 +381,18 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
                 <input
                   className={css.fieldInput}
                   value={cookieDraft}
+                  disabled={saving}
                   placeholder="__Host-console_session=…"
                   spellCheck={false}
                   autoComplete="off"
-                  onChange={(e) => { setCookieDraft(e.target.value) }}
+                  onChange={(e) => { setCookieDraft(e.target.value); setSaveFailed(false) }}
                   onFocus={(e) => { if (e.target.value === maskedText(config?.cookie)) e.target.select() }}
                 />
               </label>
+              {saveFailed && <span role="alert" className={css.errorText}>{t('ocgo.saveFailed')}</span>}
               <span className={css.foot}>
                 <span className={css.setHint}>{t('ocgo.setHint')}</span>
-                <button type="button" className={css.refreshBtn} onClick={closePanel}>
+                <button type="button" className={css.refreshBtn} onClick={closePanel} disabled={saving}>
                   {t('ocgo.save')}
                 </button>
               </span>
@@ -424,16 +449,17 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
       {open && (
         <span className={css.details}>
           {mode === 'set' ? (
-            <span className={css.setPanel}>
+            <span className={css.setPanel} aria-busy={saving}>
               <label className={css.field}>
                 <span className={css.fieldLabel}>{t('ocgo.workspaceID')}</span>
                 <input
                   className={css.fieldInput}
                   value={wsDraft}
+                  disabled={saving}
                   placeholder="org_…"
                   spellCheck={false}
                   autoComplete="off"
-                  onChange={(e) => { setWsDraft(e.target.value) }}
+                  onChange={(e) => { setWsDraft(e.target.value); setSaveFailed(false) }}
                   onFocus={(e) => { if (e.target.value === maskedText(config?.workspaceID)) e.target.select() }}
                 />
               </label>
@@ -442,16 +468,18 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
                 <input
                   className={css.fieldInput}
                   value={cookieDraft}
+                  disabled={saving}
                   placeholder="__Host-console_session=…"
                   spellCheck={false}
                   autoComplete="off"
-                  onChange={(e) => { setCookieDraft(e.target.value) }}
+                  onChange={(e) => { setCookieDraft(e.target.value); setSaveFailed(false) }}
                   onFocus={(e) => { if (e.target.value === maskedText(config?.cookie)) e.target.select() }}
                 />
               </label>
+              {saveFailed && <span role="alert" className={css.errorText}>{t('ocgo.saveFailed')}</span>}
               <span className={css.foot}>
                 <span className={css.setHint}>{t('ocgo.setHint')}</span>
-                <button type="button" className={css.refreshBtn} onClick={closePanel}>
+                <button type="button" className={css.refreshBtn} onClick={closePanel} disabled={saving}>
                   {t('ocgo.save')}
                 </button>
               </span>

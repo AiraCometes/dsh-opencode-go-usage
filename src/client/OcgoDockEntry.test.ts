@@ -2,6 +2,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { en } from './locales.ts'
 import { OcgoDockEntry, type OcgoDockEntryProps } from './OcgoDockEntry.tsx'
 
 let root: Root
@@ -23,10 +24,10 @@ afterEach(async () => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })
-async function mount() {
+async function mount(t: (key: string) => string = key => key) {
   await act(async () => {
     root.render(createElement(OcgoDockEntry, {
-      provider: async () => provider, t: (key: string) => key,
+      provider: async () => provider, t,
     } as unknown as OcgoDockEntryProps))
   })
 }
@@ -64,5 +65,73 @@ describe('rendered usage entry', () => {
     await mount()
     expect(container.textContent).toContain('<err:noconfig>')
     expect(container.querySelector('button')?.getAttribute('aria-label')).toContain('ocgo.set')
+  })
+})
+
+
+async function editCookie(value: string) {
+  const input = container.querySelector<HTMLInputElement>('input[placeholder="__Host-console_session=…"]')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+async function confirmEditor(trigger: string) {
+  await act(async () => {
+    if (trigger === 'outside') document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    else if (trigger === 'escape') document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    else Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Save')!.click()
+  })
+}
+const masked = { cookie: { set: false, tail: '' }, workspaceID: { set: true, tail: 'mple' } }
+const translate = (key: string) => (en as Record<string, string>)[key] ?? key
+
+describe('configuration save feedback', () => {
+  it.each(['error', 'usage'].flatMap(mode => ['save', 'outside', 'escape'].map(trigger => ({ mode, trigger }))))
+    ('keeps $mode editor open after failed $trigger, then closes after a successful retry', async ({ mode, trigger }) => {
+      let fail = true
+      const writes: unknown[] = []
+      vi.stubGlobal('fetch', vi.fn(async (path: string, init?: RequestInit) => {
+        if (init?.method === 'POST') {
+          writes.push(JSON.parse(init.body as string))
+          return { ok: !fail, status: fail ? 400 : 200, json: async () => masked }
+        }
+        return { ok: true, json: async () => path.endsWith('/config') ? masked : mode === 'error' ? { error: 'noconfig' } : sample }
+      }))
+      await mount(translate)
+      await act(async () => { container.querySelector('button')!.click() })
+      if (mode === 'usage') {
+        await act(async () => { Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Set')!.click() })
+      }
+      await editCookie('auth=example-legacy')
+      await confirmEditor(trigger)
+      expect(writes).toEqual([{ cookie: 'auth=example-legacy' }])
+      expect(container.querySelector('[role="alert"]')?.textContent).toContain('__Host-console_session')
+      expect(container.querySelector<HTMLInputElement>('input[placeholder="__Host-console_session=…"]')?.value).toBe('auth=example-legacy')
+      fail = false
+      await editCookie('__Host-console_session=example-corrected')
+      expect(container.querySelector('[role="alert"]')).toBeNull()
+      await confirmEditor('save')
+      expect(writes).toHaveLength(2)
+      expect(container.querySelector('input')).toBeNull()
+    })
+  it('waits for the pending write and does not submit it twice', async () => {
+    let rejectWrite!: (error: Error) => void
+    const writes = vi.fn(() => new Promise((_resolve, reject) => { rejectWrite = reject }))
+    vi.stubGlobal('fetch', vi.fn(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return writes()
+      return { ok: true, json: async () => path.endsWith('/config') ? masked : { error: 'noconfig' } }
+    }))
+    await mount(translate)
+    await act(async () => { container.querySelector('button')!.click() })
+    await editCookie('example-session')
+    await confirmEditor('outside')
+    expect(container.querySelector('input')?.disabled).toBe(true)
+    await confirmEditor('escape')
+    expect(writes).toHaveBeenCalledTimes(1)
+    await act(async () => { rejectWrite(new Error('example-network-failure')) })
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Could not save')
+    expect(container.querySelector('input')?.disabled).toBe(false)
+    expect(container.querySelector<HTMLInputElement>('input[placeholder="__Host-console_session=…"]')?.value).toBe('example-session')
   })
 })
