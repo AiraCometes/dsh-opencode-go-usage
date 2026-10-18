@@ -152,7 +152,7 @@ function WindowSegment(props: { window: UsageWindow; sep: string; compact?: bool
       <span className={css.segSep}>{sep}</span>
       <span className={cls ?? undefined}>
         {WINDOW_LABELS[window.kind]} {window.percent}%
-        {!compact ? ` (${formatDuration(window.resetInSec)})` : ''}
+        {!compact && window.resetInSec !== undefined ? ` (${formatDuration(window.resetInSec)})` : ''}
       </span>
     </span>
   )
@@ -346,7 +346,7 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
                 <input
                   className={css.fieldInput}
                   value={wsDraft}
-                  placeholder="wrk_…"
+                  placeholder="org_…"
                   spellCheck={false}
                   autoComplete="off"
                   onChange={(e) => { setWsDraft(e.target.value) }}
@@ -358,7 +358,7 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
                 <input
                   className={css.fieldInput}
                   value={cookieDraft}
-                  placeholder="auth=…"
+                  placeholder="__Host-console_session=…"
                   spellCheck={false}
                   autoComplete="off"
                   onChange={(e) => { setCookieDraft(e.target.value) }}
@@ -430,7 +430,7 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
                 <input
                   className={css.fieldInput}
                   value={wsDraft}
-                  placeholder="wrk_…"
+                  placeholder="org_…"
                   spellCheck={false}
                   autoComplete="off"
                   onChange={(e) => { setWsDraft(e.target.value) }}
@@ -442,7 +442,7 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
                 <input
                   className={css.fieldInput}
                   value={cookieDraft}
-                  placeholder="auth=…"
+                  placeholder="__Host-console_session=…"
                   spellCheck={false}
                   autoComplete="off"
                   onChange={(e) => { setCookieDraft(e.target.value) }}
@@ -465,9 +465,9 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
                   </span>
                   <span className={css.windowValue}>
                     <span className={severityClass(w) ?? undefined}>{w.percent}%</span>
-                    <span className={css.windowReset}>
+                    {w.resetInSec === undefined ? null : <span className={css.windowReset}>
                       {t('ocgo.resetsIn', { duration: formatDuration(w.resetInSec) })}
-                    </span>
+                    </span>}
                   </span>
                 </span>
               ))}

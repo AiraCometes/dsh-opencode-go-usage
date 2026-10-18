@@ -9,7 +9,7 @@ English | [中文](README.md)
 
 ![Footer demo](assets/custom-footer.png)
 
-A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) **bundle** that shows [OpenCode Go](https://opencode.ai/docs/go/) subscription usage in the Web GUI's input toolbar (logo-only in narrow toolbars).
+A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) **bundle** that shows [OpenCode Go](https://dev.opencode.ai/v2/docs/console/go) subscription usage in the Web GUI's input toolbar (logo-only in narrow toolbars).
 
 The Web counterpart of the [pi-ocgo-usage](https://github.com/v587d/pi-ocgo-usage) Pi extension: three usage windows (rolling 5h, weekly, monthly) with percentages and reset countdowns, color-coded so you see a window approaching exhaustion before you hit the rate limit mid-work.
 
@@ -29,7 +29,7 @@ OpenCode Go: 5h 0% (1h 23m) · wk 65% (2d 20h) · mo 83% (6d 21h) · upd 20:15
 - **Graceful degradation** — missing config shows `<err:noconfig>`, HTTP failures `<err:httpXXX>`; on error, clicking the chip opens the Set editor directly
 - **Cookie stays on the host** — the browser only ever talks to the same-origin `/api/ocgo-usage` JSON endpoint; the cookie never reaches the page
 
-> **⚠️ Requires an OpenCode Go session cookie.** The cookie is a full user session (not an API key) and grants access to your entire OpenCode account. Treat it like a password — see [Configuration](#configuration).
+> **⚠️ Requires the OpenCode Console `__Host-console_session` cookie.** The cookie is a full user session (not an API key) and grants access to your entire OpenCode account. Treat it like a password — see [Configuration](#configuration).
 
 ## Requirements
 
@@ -58,8 +58,8 @@ npm does not change the plugin installation command.
 ### From a tarball
 
 ```sh
-pnpm pack            # in this repo → dsh-ocgo-usage-0.1.3-rc.2.1.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.3-rc.2.1.tgz
+pnpm pack            # in this repo → dsh-ocgo-usage-0.1.4-rc.2.0.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.4-rc.2.0.tgz
 ```
 
 ### From a local checkout (development)
@@ -80,6 +80,15 @@ dsh --profile web --dump-config   # shows a "# == dsh-ocgo-usage" layer
 
 ## Configuration
 
+### Console credentials
+
+1. Sign in at `https://opencode.ai/console` and open the workspace's Go page.
+2. Copy the `org_…` (or existing `wrk_…`) ID from the URL. Keep its prefix; enter only the ID, not the whole URL.
+3. In the browser developer tools, open Application → Cookies → `https://opencode.ai` and copy `__Host-console_session`. Paste `__Host-console_session=<value>` into the plugin's cookie field (a bare Console session value is also accepted).
+4. The old `auth=<value>` cookie must be replaced, not renamed: it is a different login session. Do not paste real cookie values into issues or chat.
+
+The `workspaceID` setting and environment variable retain their existing names and now accept organization IDs. Missing reset timestamps omit the countdown; they do not mean zero seconds. The monthly meter uses the subscription period end only when it has no reset timestamp.
+
 ### Option 1: the in-UI Set panel (easiest)
 
 Click the chip to expand → `Set` (bottom-left) → type the workspace id and cookie (existing values show as `••••` + last 4 chars; focus a field to type a replacement) → click outside / press Esc / hit Save — it takes effect immediately.
@@ -89,8 +98,8 @@ Click the chip to expand → `Set` (bottom-left) → type the workspace id and c
 ### Option 2: environment variables (same names as pi-ocgo-usage)
 
 ```sh
-export OPENCODE_GO_COOKIE="auth=Fe26.2*...; oc_locale=en"
-export OPENCODE_GO_WORKSPACE_ID="wrk_01XXXXXXXXXXXXXXXXXXXXXXXX"
+export OPENCODE_GO_COOKIE="__Host-console_session=example-session; oc_locale=en"
+export OPENCODE_GO_WORKSPACE_ID="org_example"
 ```
 
 ### Option 3: config file
@@ -99,8 +108,8 @@ Write `$DSH_HOME/ocgo-usage.json` (default `~/.dsh/ocgo-usage.json`):
 
 ```jsonc
 {
-  "cookie": "auth=Fe26.2*...; oc_locale=en",
-  "workspaceID": "wrk_01XXXXXXXXXXXXXXXXXXXXXXXX"
+  "cookie": "__Host-console_session=example-session; oc_locale=en",
+  "workspaceID": "org_example"
 }
 ```
 
@@ -126,7 +135,7 @@ Composition-level config (via `~/.dsh/profiles/web/cordis.patch.yml`):
     enabled: false    # master switch, default true
 ```
 
-> **Cookie expiration:** the `auth` cookie is valid for 1 year from issue. When it expires (or is revoked), the page 302-redirects to the login page; the chip then shows `<err:http302>` instead of stale numbers. Re-login to opencode.ai and update the cookie via the Set panel.
+> **Session expiration:** if the Console responds with HTTP 401/403, sign in again and replace `__Host-console_session`. The old website `auth` cookie alone cannot authenticate the Console. Redirects are not followed. A response with no subscription is reported as `<err:nosubscription>`; invalid JSON/meters are `<err:parse>`, not an invented authentication error.
 
 ## Usage
 
@@ -136,14 +145,14 @@ Click the chip to expand the detail panel: each window shows its full name, perc
 
 ## How it works
 
-- **Host half** (`src/index.ts`, `src/service.ts`, `src/api.ts`, `src/routes.ts`) — fetches `GET /workspace/<wrk>/go` with the cookie, parses the SSR-rendered `data-slot="usage-item"` blocks into `{percent, resetInSec, status}` per window, caches the result, and serves it as same-origin JSON at `/api/ocgo-usage` (+ `/api/ocgo-usage/refresh`, `/api/ocgo-usage/config`).
+- **Host half** (`src/index.ts`, `src/service.ts`, `src/api.ts`, `src/routes.ts`) — fetches `GET /console/api/go/status` with the Console session cookie and `x-org-id` header, converts `access.meters.fiveHour/week/month` from used/limit micro-cents into percentages and reset timestamps, caches the result, and serves it as same-origin JSON at `/api/ocgo-usage` (+ `/api/ocgo-usage/refresh`, `/api/ocgo-usage/config`).
 - **Browser half** (`src/client/`) — registers a chip into the `conversation.input.right` slot, polls the host endpoints every 10 s, and renders the three windows with severity colors; visibility comes from the live provider in `modelDirectories`.
 
 The browser never sees the cookie; all fetching and parsing happen on the host.
 
 ## Security
 
-- The `auth` cookie is a **full OpenCode user session**. Anyone with it can access every workspace, subscription, and billing detail in your account.
+- The `__Host-console_session` cookie is a **full OpenCode Console user session**. Anyone with it can access every workspace, subscription, and billing detail in your account.
 - The plugin **never** logs the cookie, includes it in error messages, or sends it to the browser.
 - The config editor only writes new values to `$DSH_HOME/ocgo-usage.json` (chmod 600); the browser only ever sees the `••••` + last-4 masked view.
 

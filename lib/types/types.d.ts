@@ -12,8 +12,8 @@ export interface UsageWindow {
     readonly kind: UsageWindowKind;
     /** 0–100 integer percent. */
     readonly percent: number;
-    /** Seconds until the window resets (coarse estimate from the SSR page). */
-    readonly resetInSec: number;
+    /** Seconds until reset, absent when the Console has no deadline. */
+    readonly resetInSec?: number;
     /** `rate-limited` when the window is exhausted. */
     readonly status: UsageStatus;
 }
@@ -28,9 +28,9 @@ export interface NormalizedUsage {
 }
 /** Fully resolved plugin configuration (env + config file + defaults). */
 export interface OcgoConfig {
-    /** Full `Cookie:` header value (e.g. `auth=Fe26.2*...; oc_locale=zh`). */
+    /** Console `Cookie:` header including `__Host-console_session`. */
     readonly cookie?: string;
-    /** OpenCode workspace id (e.g. `wrk_01...`). */
+    /** OpenCode organization/workspace ID (`org_...` or legacy `wrk_...`). */
     readonly workspaceID?: string;
     /** API base URL. */
     readonly baseUrl: string;

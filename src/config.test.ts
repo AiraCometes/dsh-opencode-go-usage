@@ -48,13 +48,13 @@ describe('normalizeCookie', () => {
     expect(normalizeCookie('auth=Fe26.2*abc')).toBe('auth=Fe26.2*abc; oc_locale=en')
   })
 
-  it('prefixes auth= onto a bare auth value', () => {
-    expect(normalizeCookie('Fe26.2*abc')).toBe('auth=Fe26.2*abc; oc_locale=en')
+  it('prefixes the Console cookie name onto a bare session value', () => {
+    expect(normalizeCookie('Fe26.2*abc')).toBe('__Host-console_session=Fe26.2*abc; oc_locale=en')
   })
 
   it('preserves a pasted locale (zh stays zh, ja stays ja)', () => {
-    expect(normalizeCookie('Fe26.2*abc; oc_locale=zh')).toBe('auth=Fe26.2*abc; oc_locale=zh')
-    expect(normalizeCookie('Fe26.2*abc; oc_locale=ja')).toBe('auth=Fe26.2*abc; oc_locale=ja')
+    expect(normalizeCookie('Fe26.2*abc; oc_locale=zh')).toBe('__Host-console_session=Fe26.2*abc; oc_locale=zh')
+    expect(normalizeCookie('Fe26.2*abc; oc_locale=ja')).toBe('__Host-console_session=Fe26.2*abc; oc_locale=ja')
   })
 
   it('falls back to en when the locale is absent or malformed', () => {
@@ -132,7 +132,7 @@ describe('loadConfig', () => {
     process.env[ENV_CACHE_TTL] = '120'
     process.env[ENV_TIMEOUT_MS] = '5000'
     const cfg = loadConfig()
-    expect(cfg.cookie).toBe('auth=Fe26.2*env; oc_locale=en')
+    expect(cfg.cookie).toBe('__Host-console_session=Fe26.2*env; oc_locale=en')
     expect(cfg.workspaceID).toBe('wrk_env')
     expect(cfg.baseUrl).toBe('https://example.com')
     expect(cfg.cacheTTL).toBe(120)
@@ -153,12 +153,12 @@ describe('loadConfig', () => {
 
   it('falls back to the config file and clamps cacheTTL', () => {
     writeFileSync(join(tmp, 'ocgo-usage.json'), JSON.stringify({
-      cookie: 'Fe26.2*file',
+      cookie: '__Host-console_session=example-file',
       workspaceID: 'wrk_file',
       cacheTTL: 9999,
     }))
     const cfg = loadConfig()
-    expect(cfg.cookie).toBe('auth=Fe26.2*file; oc_locale=en')
+    expect(cfg.cookie).toBe('__Host-console_session=example-file; oc_locale=en')
     expect(cfg.workspaceID).toBe('wrk_file')
     expect(cfg.cacheTTL).toBe(3600)
     expect(cfg.timeoutMs).toBe(DEFAULT_TIMEOUT_MS)
@@ -207,15 +207,15 @@ describe('masked config view + write', () => {
   })
 
   it('writes new values to the config file and normalizes the cookie', () => {
-    const view = writeConfigFile({ cookie: 'Fe26.2*new', workspaceID: 'wrk_new' })
-    // The written cookie is normalized to "auth=Fe26.2*new; oc_locale=en";
+    const view = writeConfigFile({ cookie: 'example-session', workspaceID: 'wrk_new' })
+    // The written cookie is normalized to "__Host-console_session=example-session; oc_locale=en";
     // its tail is the whole header's last 4 chars.
-    expect(view.cookie).toEqual({ set: true, tail: 'auth=Fe26.2*new; oc_locale=en'.slice(-4) })
+    expect(view.cookie).toEqual({ set: true, tail: '__Host-console_session=example-session; oc_locale=en'.slice(-4) })
     expect(view.workspaceID).toEqual({ set: true, tail: 'wrk_new'.slice(-4) })
     // loadConfig now reads the written file (normalized cookie with auth=).
     const cfg = loadConfig()
     expect(cfg.workspaceID).toBe('wrk_new')
-    expect(cfg.cookie).toBe('auth=Fe26.2*new; oc_locale=en')
+    expect(cfg.cookie).toBe('__Host-console_session=example-session; oc_locale=en')
   })
 
   it('preserves other fields and clears a field with null', () => {
@@ -246,5 +246,23 @@ describe('masked config view + write', () => {
     const raw = JSON.parse(readFileSync(join(tmp, 'ocgo-usage.json'), 'utf8'))
     expect(raw.cookie).toBe('auth=Fe26.2*keepme; oc_locale=zh')
     expect(raw.workspaceID).toBe('wrk_new3')
+  })
+})
+
+
+describe('Console session cookie normalization', () => {
+  it('preserves Console sessions even without legacy auth and drops unrelated cookies', () => {
+    expect(normalizeCookie('preference=example; __Host-console_session=example-session; oc_locale=ja'))
+      .toBe('__Host-console_session=example-session; oc_locale=ja')
+  })
+  it('treats bare values as Console sessions', () => {
+    expect(normalizeCookie('example-session')).toBe('__Host-console_session=example-session; oc_locale=en')
+  })
+  it('preserves explicitly named legacy auth without treating it as a Console session', () => {
+    expect(normalizeCookie('auth=example-legacy')).toBe('auth=example-legacy; oc_locale=en')
+  })
+  it('does not accept header injection or unrelated preferences as sessions', () => {
+    expect(normalizeCookie('__Host-console_session=example\r\nx-extra: value')).toBeUndefined()
+    expect(normalizeCookie('oc_locale=ja; preference=example')).toBeUndefined()
   })
 })

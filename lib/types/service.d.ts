@@ -2,7 +2,7 @@
  * dsh-ocgo-usage host service — the cached OpenCode Go usage read.
  * Resolves the config (env + $DSH_HOME/ocgo-usage.json) on every refresh so
  * a changed cookie reaches the next query without a plugin restart, fetches
- * the SSR usage page, and caches the result so the browser readout can poll
+ * the Console usage JSON, and caches the result so the browser readout can poll
  * without spamming opencode.ai.
  * @module dsh-ocgo-usage/service
  */

@@ -43,6 +43,13 @@ describe('rendered usage entry', () => {
     expect(container.textContent).toContain('ocgo.resetsIn')
     expect(container.textContent).toContain('ocgo.rolling')
   })
+  it('does not invent a reset countdown when the Console omits its timestamp', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ rolling: { kind: 'rolling', percent: 0, status: 'ok' } }) })))
+    await mount()
+    await act(async () => { container.querySelector('button')?.click() })
+    expect(container.textContent).toContain('0%')
+    expect(container.textContent).not.toContain('ocgo.resetsIn')
+  })
   it('hides other providers and returns after switching back', async () => {
     await mount()
     provider = 'deepseek'
