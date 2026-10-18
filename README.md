@@ -1,6 +1,6 @@
 # dsh-opencode-go-usage
 
-> Compatibility fork for DeepSeek Harness 0.2.1-alpha.2: see [COMPATIBILITY.md](COMPATIBILITY.md).
+> Compatibility fork for DeepSeek Harness 0.2.1-rc.2: see [COMPATIBILITY.md](COMPATIBILITY.md).
 
 [English](README.en.md) | 中文
 
@@ -44,7 +44,7 @@ OpenCode Go: 5h 0% (1h 23m) · wk 65% (2d 20h) · mo 83% (6d 21h) · upd 20:15
 ### 从 GitHub 安装（推荐）
 
 ```sh
-dsh plugin --profile web add github:v587d/dsh-opencode-go-usage
+dsh plugin --profile web add 'github:AiraCometes/dsh-opencode-go-usage#codex/support-dsh-rc2'
 ```
 
 因为 `lib/` 已提交到仓库，pnpm 直接安装构建好的包，不会要求构建脚本授权。
@@ -55,7 +55,7 @@ dsh plugin --profile web add github:v587d/dsh-opencode-go-usage
 dsh plugin --profile web add dsh-ocgo-usage
 ```
 
-> **关于包名：** 仓库名为 `dsh-opencode-go-usage`，但 npm 上同名包已被他人抢先占用（一个功能类似的第三方插件），因此 npm 发布名定为 `dsh-ocgo-usage`。GitHub 安装（推荐）不受影响：`dsh plugin --profile web add github:v587d/dsh-opencode-go-usage`。
+> **关于包名：** 仓库名为 `dsh-opencode-go-usage`，但 npm 上同名包已被他人抢先占用（一个功能类似的第三方插件），因此 npm 发布名定为 `dsh-ocgo-usage`。GitHub 安装（推荐）不受影响：`dsh plugin --profile web add 'github:AiraCometes/dsh-opencode-go-usage#codex/support-dsh-rc2'`。
 
 ### 从 tarball 安装
 
@@ -67,7 +67,7 @@ dsh plugin --profile web add ./dsh-ocgo-usage-0.1.0.tgz
 ### 本地开发安装
 
 ```sh
-git clone https://github.com/v587d/dsh-opencode-go-usage.git
+git clone --branch codex/support-dsh-rc2 https://github.com/AiraCometes/dsh-opencode-go-usage.git
 cd dsh-opencode-go-usage
 pnpm install
 pnpm run build
