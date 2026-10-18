@@ -4,13 +4,12 @@
 
 [English](README.en.md) | 中文
 
-[![npm](https://img.shields.io/npm/v/dsh-ocgo-usage)](https://www.npmjs.com/package/dsh-ocgo-usage)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 
 ![Footer demo](assets/custom-footer.png)
 
-一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) **bundle**，在 Web 界面的输入框上方 dock（与内置 token 统计同位置）显示 [OpenCode Go](https://opencode.ai/docs/go/) 订阅用量。
+一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) **bundle**，在 Web 界面的输入框工具栏（窄工具栏中仅显示 Logo）显示 [OpenCode Go](https://opencode.ai/docs/go/) 订阅用量。
 
 它是 [pi-ocgo-usage](https://github.com/v587d/pi-ocgo-usage)（Pi 插件）的 Web 对应物：三个用量窗口（5h 滚动 / 每周 / 每月）的百分比与重置倒计时，按阈值变色，让你在窗口耗尽、请求被限流之前就发现。
 
@@ -34,7 +33,7 @@ OpenCode Go: 5h 0% (1h 23m) · wk 65% (2d 20h) · mo 83% (6d 21h) · upd 20:15
 
 ## 环境要求
 
-- DeepSeek Harness `0.1.0-rc.6` 或更新（web profile）
+- DeepSeek Harness **仅 `0.2.1-rc.2`**（web profile）；后续版本需要单独验证
 - `PATH` 上有 pnpm（`dsh plugin` 需要）
 
 ## 安装
@@ -44,37 +43,35 @@ OpenCode Go: 5h 0% (1h 23m) · wk 65% (2d 20h) · mo 83% (6d 21h) · upd 20:15
 ### 从 GitHub 安装（推荐）
 
 ```sh
-dsh plugin --profile web add 'github:AiraCometes/dsh-opencode-go-usage#codex/support-dsh-rc2'
+dsh plugin --profile web add 'github:AiraCometes/dsh-opencode-go-usage#main'
 ```
 
 因为 `lib/` 已提交到仓库，pnpm 直接安装构建好的包，不会要求构建脚本授权。
 
-### 从 npm 安装（发布后）
+### npm 包说明
 
-```sh
-dsh plugin --profile web add dsh-ocgo-usage
-```
-
-> **关于包名：** 仓库名为 `dsh-opencode-go-usage`，但 npm 上同名包已被他人抢先占用（一个功能类似的第三方插件），因此 npm 发布名定为 `dsh-ocgo-usage`。GitHub 安装（推荐）不受影响：`dsh plugin --profile web add 'github:AiraCometes/dsh-opencode-go-usage#codex/support-dsh-rc2'`。
+此兼容 fork 尚未发布到 npm。注册表中的 `dsh-ocgo-usage` 是上游包，
+不会安装此 fork。请使用上面的 GitHub 命令，或从当前仓库构建 tarball。
+即使 DSH 本身通过 npm 安装，插件仍使用上面的 GitHub 命令。
 
 ### 从 tarball 安装
 
 ```sh
-pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.0.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.0.tgz
+pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.3-rc.2.1.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.3-rc.2.1.tgz
 ```
 
 ### 本地开发安装
 
 ```sh
-git clone --branch codex/support-dsh-rc2 https://github.com/AiraCometes/dsh-opencode-go-usage.git
+git clone --branch main https://github.com/AiraCometes/dsh-opencode-go-usage.git
 cd dsh-opencode-go-usage
 pnpm install
 pnpm run build
 dsh plugin --profile web add link:$(pwd)
 ```
 
-**重启 `dsh web` 并刷新页面**，chip 出现在输入框上方的 dock。不启动即可验证插件层已组合：
+**使用平时的启动命令重启 Harness 并刷新页面**，选择 OpenCode Go 后 chip 出现在输入框工具栏中。不启动即可验证插件层已组合：
 
 ```sh
 dsh --profile web --dump-config   # 应显示 "# == dsh-ocgo-usage" 层
