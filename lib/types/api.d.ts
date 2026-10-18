@@ -1,9 +1,3 @@
-/**
- * OpenCode Console JSON transport and usage normalization.
- * Legacy SSR parsing exports remain available to existing consumers, but no
- * authenticated request is sent to the retired /workspace/<id>/go page.
- * @module dsh-ocgo-usage/api
- */
 import type { NormalizedUsage, OcgoConfig } from './types.ts';
 /** Error thrown by the HTTP / parsing layer; carries a short code for the UI. */
 export declare class UsageError extends Error {
@@ -16,6 +10,7 @@ export declare function fromConsoleJSON(payload: unknown, now?: number): Omit<No
 /** Read the current Console using its session cookie and organization header. */
 export declare function fetchViaCookie(cfg: OcgoConfig): Promise<Omit<NormalizedUsage, 'updatedAt'>>;
 /**
+ * @deprecated Legacy parser export retained for existing consumers only.
  * Parse the opencode console SSR HTML page and extract the three usage
  * windows. Reset times are emitted as English phrases inside
  * `data-slot="reset-time"` (e.g. "Resets in 2 hours 29 minutes"). We parse

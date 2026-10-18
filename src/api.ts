@@ -4,6 +4,7 @@
  * authenticated request is sent to the retired /workspace/<id>/go page.
  * @module dsh-ocgo-usage/api
  */
+import { normalizeCookie } from './config.ts'
 import type { NormalizedUsage, OcgoConfig, UsageWindow, UsageWindowKind } from './types.ts'
 
 // ============================================================================
@@ -33,6 +34,10 @@ async function fetchConsoleJSON(cfg: OcgoConfig): Promise<unknown> {
       signal: controller.signal,
     })
     if (!res.ok) {
+      await res.body?.cancel().catch(() => {})
+      if (cfg.workspaceID?.startsWith('wrk_') && [400, 401, 403].includes(res.status)) {
+        throw new UsageError(`Console returned HTTP ${res.status} for a legacy wrk_ ID; verify the current org_ ID in the Console URL and the Console session cookie`, 'workspace')
+      }
       throw new UsageError(`OpenCode Console returned HTTP ${res.status}`, `http${res.status}`)
     }
     const text = await res.text()
@@ -78,7 +83,7 @@ export function fromConsoleJSON(payload: unknown, now = Date.now()): Omit<Normal
   }
   const access = record(root?.access)
   const meters = record(access?.meters)
-  if (!meters || !record(meters.fiveHour)) return parseError()
+  if (!meters) return parseError()
   const result: { rolling?: UsageWindow; weekly?: UsageWindow; monthly?: UsageWindow } = {}
   for (const [key, kind] of [['fiveHour', 'rolling'], ['week', 'weekly'], ['month', 'monthly']] as const) {
     const value = meters[key]
@@ -88,7 +93,7 @@ export function fromConsoleJSON(payload: unknown, now = Date.now()): Omit<Normal
     const used = microCents(meter.usedMicroCents)
     const limit = microCents(meter.limitMicroCents)
     if (limit === 0n) return parseError()
-    const resetInSec = resetSeconds(meter.resetsAt ?? (kind === 'monthly' ? access?.endsAt : undefined), now)
+    const resetInSec = resetSeconds(meter.resetsAt, now)
     result[kind] = {
       kind,
       percent: Number(used >= limit ? 100n : used * 100n / limit),
@@ -96,21 +101,21 @@ export function fromConsoleJSON(payload: unknown, now = Date.now()): Omit<Normal
       status: used >= limit ? 'rate-limited' : 'ok',
     }
   }
+  if (Object.keys(result).length === 0) return parseError()
   return result
 }
 
 /** Read the current Console using its session cookie and organization header. */
 export async function fetchViaCookie(cfg: OcgoConfig): Promise<Omit<NormalizedUsage, 'updatedAt'>> {
-  if (!cfg.cookie || !cfg.workspaceID) {
-    throw new UsageError('Set the Console session cookie and workspace / organization ID', 'noconfig')
+  const cookie = normalizeCookie(cfg.cookie)
+  const workspaceID = cfg.workspaceID?.trim()
+  if (!cookie || !workspaceID) {
+    throw new UsageError('Set the Console __Host-console_session cookie and workspace / organization ID', 'noconfig')
   }
-  if (!/(?:^|;\s*)__Host-console_session=[^;\s]+/.test(cfg.cookie)) {
-    throw new UsageError('Set __Host-console_session from OpenCode Console; the old auth cookie is insufficient', 'noconfig')
-  }
-  if (!/^(?:org|wrk)_[A-Za-z0-9_-]+$/.test(cfg.workspaceID)) {
+  if (!/^(?:org|wrk)_[A-Za-z0-9_-]+$/.test(workspaceID)) {
     throw new UsageError('Workspace / organization ID must start with org_ or wrk_', 'workspace')
   }
-  return fromConsoleJSON(await fetchConsoleJSON(cfg))
+  return fromConsoleJSON(await fetchConsoleJSON({ ...cfg, cookie, workspaceID }))
 }
 
 interface SSRUsageItem {
@@ -120,6 +125,7 @@ interface SSRUsageItem {
 }
 
 /**
+ * @deprecated Legacy parser export retained for existing consumers only.
  * Parse the opencode console SSR HTML page and extract the three usage
  * windows. Reset times are emitted as English phrases inside
  * `data-slot="reset-time"` (e.g. "Resets in 2 hours 29 minutes"). We parse

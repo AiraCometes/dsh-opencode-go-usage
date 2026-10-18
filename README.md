@@ -57,8 +57,8 @@ dsh plugin --profile web add 'github:AiraCometes/dsh-opencode-go-usage#main'
 ### 从 tarball 安装
 
 ```sh
-pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.4-rc.2.0.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.4-rc.2.0.tgz
+pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.4-rc.2.1.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.4-rc.2.1.tgz
 ```
 
 ### 本地开发安装
@@ -86,7 +86,7 @@ dsh --profile web --dump-config   # 应显示 "# == dsh-ocgo-usage" 层
 3. 在浏览器开发者工具的 Application → Cookies → `https://opencode.ai` 中复制 `__Host-console_session`，粘贴为 `__Host-console_session=<值>`（也接受直接粘贴 Console 会话值）。
 4. 旧 `auth=<值>` 与 Console 是不同的会话，必须重新获取，不能只改名称。不要将真实 cookie 发到 Issue 或聊天中。
 
-配置字段仍叫 `workspaceID`，现在接受组织 ID。无重置时间时不显示倒计时；月度窗口仅在缺少重置时间时使用订阅结束时间。
+配置字段仍叫 `workspaceID`，现在接受组织 ID。无重置时间时不显示倒计时；倒计时只使用用量窗口明确返回的重置时间，不把订阅结束时间当作月度重置时间。
 
 ### 方式一：界面内 Set 面板（最简单）
 
@@ -134,7 +134,7 @@ chmod 600 ~/.dsh/ocgo-usage.json
     enabled: false    # 总开关，默认 true
 ```
 
-> **会话过期：** Console 返回 HTTP 401/403 时，请重新登录并更新 `__Host-console_session`。旧的 `auth` cookie 不能单独用于 Console，且不会自动跟随重定向。未订阅显示 `<err:nosubscription>`，无效 JSON 或用量字段显示 `<err:parse>`。
+> **会话过期：** 使用 `org_…` 时 Console 返回 HTTP 401/403，可能需要重新登录并更新 `__Host-console_session`；旧 `wrk_…` 被拒绝时，还应先确认 Console URL 中当前的 ID。旧的 `auth` cookie 不能单独用于 Console，且不会自动跟随重定向。未订阅显示 `<err:nosubscription>`，无效 JSON 或用量字段显示 `<err:parse>`。
 
 ## 使用
 

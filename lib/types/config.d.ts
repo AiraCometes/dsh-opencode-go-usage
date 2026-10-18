@@ -48,6 +48,6 @@ export declare function writeConfigFile(partial: {
     cookie?: string | null;
     workspaceID?: string | null;
 }): MaskedConfigView;
-/** Keep named session cookies and locale; a bare value is a Console session. */
+/** Canonical Console cookie normalization shared by load, save and transport. */
 export declare function normalizeCookie(input: string | undefined): string | undefined;
 //# sourceMappingURL=config.d.ts.map

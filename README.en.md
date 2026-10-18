@@ -58,8 +58,8 @@ npm does not change the plugin installation command.
 ### From a tarball
 
 ```sh
-pnpm pack            # in this repo → dsh-ocgo-usage-0.1.4-rc.2.0.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.4-rc.2.0.tgz
+pnpm pack            # in this repo → dsh-ocgo-usage-0.1.4-rc.2.1.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.4-rc.2.1.tgz
 ```
 
 ### From a local checkout (development)
@@ -87,7 +87,7 @@ dsh --profile web --dump-config   # shows a "# == dsh-ocgo-usage" layer
 3. In the browser developer tools, open Application → Cookies → `https://opencode.ai` and copy `__Host-console_session`. Paste `__Host-console_session=<value>` into the plugin's cookie field (a bare Console session value is also accepted).
 4. The old `auth=<value>` cookie must be replaced, not renamed: it is a different login session. Do not paste real cookie values into issues or chat.
 
-The `workspaceID` setting and environment variable retain their existing names and now accept organization IDs. Missing reset timestamps omit the countdown; they do not mean zero seconds. The monthly meter uses the subscription period end only when it has no reset timestamp.
+The `workspaceID` setting and environment variable retain their existing names and now accept organization IDs. Missing reset timestamps omit the countdown; they do not mean zero seconds. Only explicit meter reset timestamps produce countdowns; subscription/billing end dates are not assumed to be monthly resets.
 
 ### Option 1: the in-UI Set panel (easiest)
 
@@ -135,7 +135,7 @@ Composition-level config (via `~/.dsh/profiles/web/cordis.patch.yml`):
     enabled: false    # master switch, default true
 ```
 
-> **Session expiration:** if the Console responds with HTTP 401/403, sign in again and replace `__Host-console_session`. The old website `auth` cookie alone cannot authenticate the Console. Redirects are not followed. A response with no subscription is reported as `<err:nosubscription>`; invalid JSON/meters are `<err:parse>`, not an invented authentication error.
+> **Session expiration:** for an `org_…` ID, HTTP 401/403 can require signing in again and replacing `__Host-console_session`. For a rejected legacy `wrk_…` ID, first check the current ID in the Console URL as well as the session; a `workspace` error retains the original HTTP status in its message. The old website `auth` cookie alone cannot authenticate the Console and is rejected on save without modifying existing settings. Redirects are not followed. A response with no subscription is reported as `<err:nosubscription>`; invalid JSON/meters are `<err:parse>`, not an invented authentication error.
 
 ## Usage
 

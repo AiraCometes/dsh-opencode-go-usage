@@ -64,7 +64,7 @@ export function loadConfig(): OcgoConfig {
   const cookie = normalizeCookie(pickString(process.env[ENV_COOKIE], asString(fileConfig?.cookie)))
 
   // Workspace ID: prefer env, fall back to file.
-  const workspaceID = pickString(process.env[ENV_WORKSPACE_ID], asString(fileConfig?.workspaceID))
+  const workspaceID = pickString(process.env[ENV_WORKSPACE_ID], asString(fileConfig?.workspaceID))?.trim() || undefined
 
   // baseUrl: prefer env, fall back to file, fall back to default.
   const baseUrl =
@@ -120,8 +120,12 @@ export function writeConfigFile(partial: {
     else delete next.workspaceID
   }
   if (partial.cookie !== undefined) {
-    const v = typeof partial.cookie === 'string' ? normalizeCookie(partial.cookie) : undefined
-    if (v !== undefined && v.length > 0) next.cookie = v
+    const raw = typeof partial.cookie === 'string' ? partial.cookie.trim() : ''
+    const v = normalizeCookie(raw)
+    if (raw.length > 0 && v === undefined) {
+      throw new Error('Use the OpenCode Console __Host-console_session cookie; the old auth cookie is insufficient')
+    }
+    if (v !== undefined) next.cookie = v
     else delete next.cookie
   }
   const path = configFilePath()
@@ -161,24 +165,21 @@ function pickString(envVal: string | undefined, fileVal: string | undefined): st
   return undefined
 }
 
-/** Keep named session cookies and locale; a bare value is a Console session. */
+/** Canonical Console cookie normalization shared by load, save and transport. */
 export function normalizeCookie(input: string | undefined): string | undefined {
   if (!input || /[\r\n]/.test(input)) return undefined
   const segments = input.trim().split(/[;,]/).map(s => s.trim()).filter(Boolean)
-  const sessions: string[] = []
-  for (const name of ['__Host-console_session', 'auth']) {
-    const pair = segments.find(s => s.startsWith(`${name}=`))
-    const value = pair?.slice(name.length + 1).trim().replace(/^"|"$/g, '')
-    if (value) sessions.push(`${name}=${value}`)
+  const pair = segments.find(s => s.toLowerCase().startsWith('__host-console_session='))
+  let value = pair?.slice(pair.indexOf('=') + 1).trim().replace(/^"|"$/g, '')
+  if (pair === undefined) {
+    // Do not reinterpret explicitly named legacy cookies as Console sessions.
+    value = segments.find(s => !s.includes('=') && s.length >= 8)
   }
-  if (sessions.length === 0 && segments.length > 0) {
-    const bare = segments[0]!
-    if (!bare.includes('=') && bare.length >= 8) sessions.push(`__Host-console_session=${bare}`)
-  }
-  if (sessions.length === 0) return undefined
-  const rawLocale = segments.find(s => s.startsWith('oc_locale='))?.slice('oc_locale='.length) ?? ''
+  if (!value || !/^[\x21\x23-\x2B\x2D-\x3A\x3C-\x5B\x5D-\x7E]+$/.test(value)) return undefined
+  const localePair = segments.find(s => s.toLowerCase().startsWith('oc_locale='))
+  const rawLocale = localePair?.slice(localePair.indexOf('=') + 1) ?? ''
   const locale = /^[A-Za-z]{2,3}$/.test(rawLocale) ? rawLocale.toLowerCase() : 'en'
-  return `${sessions.join('; ')}; oc_locale=${locale}`
+  return `__Host-console_session=${value}; oc_locale=${locale}`
 }
 
 function pickNumber(

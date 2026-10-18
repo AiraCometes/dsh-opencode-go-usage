@@ -53,6 +53,6 @@ The repository's release-age exceptions list only exact DeepSeek package version
 
 ## Console usage migration
 
-This revision fetches `/console/api/go/status` with the Console session cookie and `x-org-id`. It does not request `/workspace/<id>/go`. Legacy SSR parser exports remain for existing imports only. Percentages are floored integers from `usedMicroCents / limitMicroCents`; calculations use integer arithmetic, without fixed plan prices. Unknown reset deadlines stay absent in both the API response and UI. The month deadline falls back to `access.endsAt`.
+This revision fetches `/console/api/go/status` with the Console session cookie and `x-org-id`. It does not request `/workspace/<id>/go`. Legacy SSR parser exports remain for existing imports only. Percentages are floored integers from `usedMicroCents / limitMicroCents`; calculations use integer arithmetic, without fixed plan prices. Unknown reset deadlines stay absent in both the API response and UI. `access.endsAt` is not used as a monthly reset because it may describe a longer subscription term.
 
 Protocol evidence and test limitations are recorded in [docs/console-api.md](docs/console-api.md).
