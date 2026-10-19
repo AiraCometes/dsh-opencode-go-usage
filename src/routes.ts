@@ -9,7 +9,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import { maskedConfigView, writeConfigFile } from './config.ts'
+import { InvalidConsoleCookieError, maskedConfigView, writeConfigFile } from './config.ts'
 import type { OcgoUsageService, OcgoUsageView } from './service.ts'
 
 /** Browser-facing base path of the usage API. */
@@ -107,7 +107,13 @@ function makeConfigRoutes(service: OcgoUsageService): WebRoute[] {
         }
         if (req.method === 'POST') {
           Promise.resolve(write(req)).then((value) => json(res, 200, value), (error) => {
-            json(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
+            const invalidCookie = error instanceof InvalidConsoleCookieError
+            const badJson = error instanceof Error && error.message === 'bad-json'
+            json(res, invalidCookie || badJson ? 400 : 500, {
+              ok: false,
+              code: invalidCookie ? 'invalid-console-cookie' : 'config-save-failed',
+              error: invalidCookie ? error.message : 'Could not save configuration',
+            })
           })
           return
         }

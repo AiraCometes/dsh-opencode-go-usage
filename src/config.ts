@@ -102,6 +102,14 @@ export function maskedConfigView(): MaskedConfigView {
   }
 }
 
+/** Invalid input has an explicit identity for the host API; no secret is included. */
+export class InvalidConsoleCookieError extends Error {
+  constructor() {
+    super('Use the OpenCode Console __Host-console_session cookie; the old auth cookie is insufficient')
+    this.name = 'InvalidConsoleCookieError'
+  }
+}
+
 /**
  * Write cookie / workspaceID into the config file (preserving any other
  * fields), chmod 600, and return the updated masked view. Values are
@@ -123,7 +131,7 @@ export function writeConfigFile(partial: {
     const raw = typeof partial.cookie === 'string' ? partial.cookie.trim() : ''
     const v = normalizeCookie(raw)
     if (raw.length > 0 && v === undefined) {
-      throw new Error('Use the OpenCode Console __Host-console_session cookie; the old auth cookie is insufficient')
+      throw new InvalidConsoleCookieError()
     }
     if (v !== undefined) next.cookie = v
     else delete next.cookie
@@ -132,9 +140,7 @@ export function writeConfigFile(partial: {
   try {
     writeFileSync(path, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })
   } catch {
-    // Fall back to the env/current effective values rather than throwing to
-    // the browser with a partial write.
-    return maskedConfigView()
+    throw new Error('Could not write the usage configuration')
   }
   return {
     workspaceID: maskSecret(typeof next.workspaceID === 'string' ? next.workspaceID : undefined),

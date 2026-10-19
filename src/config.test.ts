@@ -3,7 +3,7 @@
  * @module dsh-ocgo-usage/config.test
  */
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -248,6 +248,11 @@ describe('masked config view + write', () => {
       .toThrow('Console __Host-console_session')
     expect(readFileSync(join(tmp, 'ocgo-usage.json'), 'utf8')).toBe(before)
     expect(maskedConfigView().cookie.set).toBe(true)
+  })
+
+  it('does not report success if the configuration file cannot be written', () => {
+    mkdirSync(join(tmp, 'ocgo-usage.json'))
+    expect(() => writeConfigFile({ cookie: 'example-session' })).toThrow('Could not write')
   })
 
   it('keeps fields absent from the write untouched (no accidental clear)', () => {

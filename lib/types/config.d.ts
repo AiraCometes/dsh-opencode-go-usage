@@ -38,6 +38,10 @@ export declare function loadConfig(): OcgoConfig;
 export declare function maskSecret(value: string | undefined): MaskedSecret;
 /** The browser-facing masked config view (never reveals the full cookie). */
 export declare function maskedConfigView(): MaskedConfigView;
+/** Invalid input has an explicit identity for the host API; no secret is included. */
+export declare class InvalidConsoleCookieError extends Error {
+    constructor();
+}
 /**
  * Write cookie / workspaceID into the config file (preserving any other
  * fields), chmod 600, and return the updated masked view. Values are
