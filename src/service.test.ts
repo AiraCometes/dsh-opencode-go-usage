@@ -14,21 +14,21 @@ import { OcgoUsageService } from './service.ts'
 const SAVED_COOKIE = process.env[ENV_COOKIE]
 const SAVED_WORKSPACE = process.env[ENV_WORKSPACE_ID]
 
-/** A realistic SSR page for the mocked fetch. */
-const OK_PAGE = `
-<div data-slot="usage-item">
-  <span data-slot="usage-label">Rolling Usage</span>
-  <span data-slot="usage-value"><!--$-->23<!--/-->%</span>
-  <span data-slot="reset-time"><!--$-->Resets in<!--/-->2 hours<!--/--></span>
-</div>`
+const NOW = Date.parse('2026-10-19T00:00:00Z')
+/** Synthetic Console meters, with the same wire fields as the public contract. */
+const OK_PAGE = JSON.stringify({ access: { meters: { fiveHour: {
+  limitMicroCents: '10000', usedMicroCents: '2300',
+  resetsAt: '2026-10-19T02:00:00Z',
+} } } })
 
 describe('OcgoUsageService', () => {
   let ctx: Context
   let tmp: string
 
   beforeEach(() => {
-    process.env[ENV_COOKIE] = 'auth=Fe26.2*test; oc_locale=zh'
-    process.env[ENV_WORKSPACE_ID] = 'wrk_test'
+    vi.spyOn(Date, 'now').mockReturnValue(NOW)
+    process.env[ENV_COOKIE] = '__Host-console_session=example-session; oc_locale=zh'
+    process.env[ENV_WORKSPACE_ID] = 'org_example'
     tmp = mkdtempSync(join(tmpdir(), 'dsh-ocgo-usage-svc-'))
     process.env.DSH_HOME = tmp
     ctx = new Context()
@@ -50,7 +50,7 @@ describe('OcgoUsageService', () => {
 
   it('returns the parsed windows on success', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'text/html' } }),
+      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'application/json' } }),
     )
     const service = new OcgoUsageService(ctx)
     const view = await service.view()
@@ -66,7 +66,7 @@ describe('OcgoUsageService', () => {
 
   it('deduplicates concurrent view() calls into one fetch', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'text/html' } }),
+      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'application/json' } }),
     )
     const service = new OcgoUsageService(ctx)
     const [a, b] = await Promise.all([service.view(), service.view()])
@@ -77,7 +77,7 @@ describe('OcgoUsageService', () => {
 
   it('serves the cached view within the TTL without refetching', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'text/html' } }),
+      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'application/json' } }),
     )
     const service = new OcgoUsageService(ctx)
     await service.view()
@@ -88,7 +88,7 @@ describe('OcgoUsageService', () => {
   it('returns a noconfig error when the cookie is missing', async () => {
     delete process.env[ENV_COOKIE]
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'text/html' } }),
+      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'application/json' } }),
     )
     const service = new OcgoUsageService(ctx)
     const view = await service.view()
@@ -111,7 +111,7 @@ describe('OcgoUsageService', () => {
 
   it('refresh() bypasses the cache window', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'text/html' } }),
+      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'application/json' } }),
     )
     const service = new OcgoUsageService(ctx)
     await service.view()
@@ -121,7 +121,7 @@ describe('OcgoUsageService', () => {
 
   it('answers disabled when the plugin is switched off', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'text/html' } }),
+      new Response(OK_PAGE, { status: 200, headers: { 'content-type': 'application/json' } }),
     )
     const service = new OcgoUsageService(ctx, { enabled: false })
     const view = await service.view()

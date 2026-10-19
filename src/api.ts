@@ -1,17 +1,10 @@
 /**
- * HTTP fetch + response adapters for dsh-ocgo-usage
- *
- * Cookie path (current): GET /workspace/<wrk>/go HTML SSR scrape.
- * The opencode.ai dashboard renders usage values inline in
- * `data-slot="usage-item"` blocks; this is the only cookie-authenticated
- * way to read usage today. (The proposed official API from
- * anomalyco/opencode#16513 is not merged yet; when it ships, an apikey
- * path can be added behind the same `NormalizedUsage` shape.)
- *
- * Adapted from pi-ocgo-usage/src/api.ts.
+ * OpenCode Console JSON transport and usage normalization.
+ * Legacy SSR parsing exports remain available to existing consumers, but no
+ * authenticated request is sent to the retired /workspace/<id>/go page.
  * @module dsh-ocgo-usage/api
  */
-
+import { normalizeCookie } from './config.ts'
 import type { NormalizedUsage, OcgoConfig, UsageWindow, UsageWindowKind } from './types.ts'
 
 // ============================================================================
@@ -29,48 +22,101 @@ export class UsageError extends Error {
   }
 }
 
-// ============================================================================
-// HTTP wrapper
-// ============================================================================
-
-/** Text fetch with structured errors (cookie SSR path). */
-async function safeFetchText(url: string, headers: Record<string, string>, timeoutMs: number): Promise<string> {
+/** Fetch the Console JSON without following redirects carrying session credentials. */
+async function fetchConsoleJSON(cfg: OcgoConfig): Promise<unknown> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const timer = setTimeout(() => controller.abort(), cfg.timeoutMs)
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${cfg.baseUrl.replace(/\/+$/, '')}/console/api/go/status`, {
       method: 'GET',
-      headers,
+      headers: { Cookie: cfg.cookie!, 'x-org-id': cfg.workspaceID!, Accept: 'application/json' },
+      redirect: 'manual',
       signal: controller.signal,
     })
     if (!res.ok) {
-      throw new UsageError(`HTTP ${res.status} for ${sanitizeUrl(url)}`, `http${res.status}`)
+      await res.body?.cancel().catch(() => {})
+      if (cfg.workspaceID?.startsWith('wrk_') && [400, 401, 403].includes(res.status)) {
+        throw new UsageError(`Console returned HTTP ${res.status} for a legacy wrk_ ID; verify the current org_ ID in the Console URL and the Console session cookie`, 'workspace')
+      }
+      throw new UsageError(`OpenCode Console returned HTTP ${res.status}`, `http${res.status}`)
     }
-    return await res.text()
-  } catch (e) {
-    if (e instanceof UsageError) throw e
-    if (e instanceof Error && e.name === 'AbortError') {
-      throw new UsageError(`Request timed out after ${timeoutMs}ms`, 'timeout')
+    const text = await res.text()
+    try { return JSON.parse(text) as unknown } catch {
+      throw new UsageError('OpenCode Console did not return valid usage JSON', 'parse')
     }
-    throw new UsageError(String(e instanceof Error ? e.message : e), 'fetch')
+  } catch (error) {
+    if (controller.signal.aborted) throw new UsageError('OpenCode Console request timed out', 'timeout')
+    if (error instanceof UsageError) throw error
+    // Fetch errors can contain header values; never forward their raw messages.
+    throw new UsageError('OpenCode Console request failed', 'fetch')
   } finally {
     clearTimeout(timer)
   }
 }
 
-/** Strip query params from a URL for safe error messages. */
-function sanitizeUrl(url: string): string {
-  try {
-    const u = new URL(url)
-    return `${u.protocol}//${u.host}${u.pathname}`
-  } catch {
-    return url
-  }
+type RecordValue = Record<string, unknown>
+function record(value: unknown): RecordValue | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as RecordValue : undefined
+}
+function parseError(): never {
+  throw new UsageError('OpenCode Console usage payload has invalid or missing meters', 'parse')
+}
+function microCents(value: unknown): bigint {
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return BigInt(value)
+  if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value)
+  return parseError()
+}
+function resetSeconds(value: unknown, now: number): number | undefined {
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'string') return parseError()
+  const at = Date.parse(value)
+  if (!Number.isFinite(at)) return parseError()
+  return Math.max(0, Math.ceil((at - now) / 1000))
 }
 
-// ============================================================================
-// Cookie path: GET /workspace/<wrk>/go (SSR HTML scrape)
-// ============================================================================
+/** Normalize Console access.meters; missing optional windows remain absent. */
+export function fromConsoleJSON(payload: unknown, now = Date.now()): Omit<NormalizedUsage, 'updatedAt'> {
+  const root = record(payload)
+  if (root?.access === null) {
+    throw new UsageError('No active OpenCode Go subscription was reported for this workspace', 'nosubscription')
+  }
+  const access = record(root?.access)
+  const meters = record(access?.meters)
+  if (!meters) return parseError()
+  const result: { rolling?: UsageWindow; weekly?: UsageWindow; monthly?: UsageWindow } = {}
+  for (const [key, kind] of [['fiveHour', 'rolling'], ['week', 'weekly'], ['month', 'monthly']] as const) {
+    const value = meters[key]
+    if (value === undefined || value === null) continue
+    const meter = record(value)
+    if (!meter) return parseError()
+    const used = microCents(meter.usedMicroCents)
+    const limit = microCents(meter.limitMicroCents)
+    if (limit === 0n) return parseError()
+    const resetInSec = resetSeconds(meter.resetsAt, now)
+    result[kind] = {
+      kind,
+      percent: Number(used >= limit ? 100n : used * 100n / limit),
+      ...(resetInSec === undefined ? {} : { resetInSec }),
+      status: used >= limit ? 'rate-limited' : 'ok',
+    }
+  }
+  if (Object.keys(result).length === 0) return parseError()
+  return result
+}
+
+/** Read the current Console using its session cookie and organization header. */
+export async function fetchViaCookie(cfg: OcgoConfig): Promise<Omit<NormalizedUsage, 'updatedAt'>> {
+  const cookie = normalizeCookie(cfg.cookie)
+  const workspaceID = cfg.workspaceID?.trim()
+  if (!cookie || !workspaceID) {
+    throw new UsageError('Set the Console __Host-console_session cookie and workspace / organization ID', 'noconfig')
+  }
+  if (!/^(?:org|wrk)_[A-Za-z0-9_-]+$/.test(workspaceID)) {
+    throw new UsageError('Workspace / organization ID must start with org_ or wrk_', 'workspace')
+  }
+  return fromConsoleJSON(await fetchConsoleJSON({ ...cfg, cookie, workspaceID }))
+}
 
 interface SSRUsageItem {
   readonly label: string
@@ -78,28 +124,8 @@ interface SSRUsageItem {
   readonly resetsIn: string
 }
 
-/** Fetch usage through the cookie path. Throws UsageError on any failure. */
-export async function fetchViaCookie(cfg: OcgoConfig): Promise<Omit<NormalizedUsage, 'updatedAt'>> {
-  if (!cfg.cookie || !cfg.workspaceID) {
-    throw new UsageError('Missing cookie or workspaceID for cookie path', 'noconfig')
-  }
-  const url = `${cfg.baseUrl}/workspace/${encodeURIComponent(cfg.workspaceID)}/go`
-  const html = await safeFetchText(
-    url,
-    { Cookie: cfg.cookie, Accept: 'text/html' },
-    cfg.timeoutMs,
-  )
-  const parsed = fromSSRHTML(html)
-  // The page 302-redirects to the login page when the cookie is invalid;
-  // that page parses as empty, which is indistinguishable from "no windows".
-  // Only report success when at least one window was found.
-  if (parsed.rolling === undefined && parsed.weekly === undefined && parsed.monthly === undefined) {
-    throw new UsageError('Usage page parsed empty (cookie expired or invalid?)', 'http302')
-  }
-  return parsed
-}
-
 /**
+ * @deprecated Legacy parser export retained for existing consumers only.
  * Parse the opencode console SSR HTML page and extract the three usage
  * windows. Reset times are emitted as English phrases inside
  * `data-slot="reset-time"` (e.g. "Resets in 2 hours 29 minutes"). We parse
@@ -242,7 +268,7 @@ export function parseDurationToSec(phrase: string): number {
 // ============================================================================
 
 /**
- * Fetch usage with the current config (cookie path only today) and stamp
+ * Fetch usage with the current Console session config and stamp
  * the fetch timestamp so the UI can show data freshness.
  */
 export async function fetchUsage(cfg: OcgoConfig): Promise<NormalizedUsage> {
