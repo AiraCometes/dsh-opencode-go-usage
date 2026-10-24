@@ -226,7 +226,16 @@
 @container (max-width: 560px) {
   .seg,
   .chevron,
-  .summary {
+  .summary,
+  .periodLabel {
     display: none;
   }
 }
+
+/* The dot stays inside the existing logo width in compact toolbars. */
+.logoMark { position: relative; display: inline-flex; flex: none; }
+.periodDot { position: absolute; width: 5px; height: 5px; border-radius: 50%; right: -2px; top: -3px; background: currentColor; }
+.periodLabel { font-size: 10px; font-weight: 600; }
+.offPeak { color: var(--dsw-alias-state-success-primary, #22863a); }
+.peak { color: var(--dsw-static-amber-600, #9a6700); }
+.periodDetails { display: flex; flex-direction: column; gap: 4px; max-width: 280px; font-size: 11px; }

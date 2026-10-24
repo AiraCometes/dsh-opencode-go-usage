@@ -24,6 +24,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type { ModelSelection } from './price-period.ts'
 import { OCGO_PROVIDER } from '../provider.ts'
 import { OcgoDockEntry, type OcgoDockEntryProps } from './OcgoDockEntry.tsx'
 import { en, zh, type OcgoKey } from './locales.ts'
@@ -56,6 +57,8 @@ export interface OcgoInjected {
    * session has no selection yet.
    */
   provider(): Promise<string | undefined>
+  /** Provider and model captured from the same live snapshot. */
+  selection(): Promise<ModelSelection | undefined>
 }
 
 /**
@@ -72,16 +75,13 @@ export function apply(ctx: ClientContext): void {
       order: 110,
       locale: NS,
       inject: (sessionId): OcgoInjected => {
-        return {
-          dockSessionId: sessionId,
-          provider: async () => {
-            try {
-              return scope.modelDirectories.directoryFor(sessionId).store.getSnapshot().current?.provider
-            } catch {
-              return undefined
-            }
-          },
+        const selection = async (): Promise<ModelSelection | undefined> => {
+          try {
+            const current = scope.modelDirectories.directoryFor(sessionId).store.getSnapshot().current
+            return current ? { provider: current.provider, model: current.model } : undefined
+          } catch { return undefined }
         }
+        return { dockSessionId: sessionId, selection, provider: async () => (await selection())?.provider }
       },
     }, OcgoDockEntry))
   })

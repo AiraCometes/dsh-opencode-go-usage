@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { pricePeriod, type ModelSelection } from './price-period.ts'
 import { isOpenCodeGo } from '../provider.ts'
 import type { MaskedConfigView, OcgoUsageView, UsageWindow, UsageWindowKind } from '../types.ts'
 import { NS, type OcgoKey } from './locales.ts'
@@ -63,7 +64,7 @@ const ocgoApi = {
 export type OcgoDockEntryProps =
   PropsRuntime<'conversation.input.right'>
   & PropsLocale<typeof NS>
-  & { dockSessionId?: string | undefined; provider?: () => Promise<string | undefined> }
+  & { dockSessionId?: string | undefined; provider?: () => Promise<string | undefined>; selection?: () => Promise<ModelSelection | undefined> }
 
 /** Short window label: 5h / wk / mo. */
 const WINDOW_LABELS: Record<UsageWindowKind, string> = {
@@ -185,6 +186,8 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
   const [view, setView] = useState<OcgoUsageView | null>(null)
   const [open, setOpen] = useState(false)
   const [visible, setVisible] = useState(true)
+  const [selected, setSelected] = useState<ModelSelection | undefined>()
+  const [clock, setClock] = useState(() => Date.now())
   // Panel mode: 'view' = windows + footer; 'set' = workspace/cookie editor.
   const [mode, setMode] = useState<'view' | 'set'>('view')
   const [config, setConfig] = useState<MaskedConfigView | null>(null)
@@ -207,13 +210,13 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
   //   2. only while visible, fetch the usage snapshot.
   const pollNow = useCallback(() => {
     let live = true
-    const provider = props.provider
-    const resolveProvider = provider !== undefined
-      ? Promise.resolve(provider()).then((p) => p ?? undefined, () => undefined)
-      : Promise.resolve(undefined)
-    resolveProvider.then((p) => {
+    const resolveSelection = props.selection !== undefined
+      ? Promise.resolve().then(() => props.selection!())
+      : Promise.resolve().then(() => props.provider?.()).then(provider => provider ? { provider, model: '' } : undefined)
+    resolveSelection.then((selection) => {
       if (!live) return
-      const shown = isOpenCodeGo(p)
+      setSelected(selection)
+      const shown = isOpenCodeGo(selection?.provider)
       setVisible(shown)
       if (!shown) setOpen(false)
       if (shown) {
@@ -227,7 +230,7 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
       if (live) setVisible(false)
     })
     return () => { live = false }
-  }, [props.provider])
+  }, [props.provider, props.selection])
 
   useEffect(() => {
     const cleanup = pollNow()
@@ -242,6 +245,21 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
       document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [pollNow])
+
+  // Local clock only: align updates to UTC minute boundaries without extra API polling.
+  useEffect(() => {
+    let timer: number
+    const update = (): void => {
+      setClock(Date.now())
+      timer = window.setTimeout(update, 60_000 - (Date.now() % 60_000))
+    }
+    const onVisibility = (): void => {
+      if (document.visibilityState === 'visible') { window.clearTimeout(timer); update() }
+    }
+    update()
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => { window.clearTimeout(timer); document.removeEventListener('visibilitychange', onVisibility) }
+  }, [])
 
   /** Load the masked config into the editor drafts. */
   const loadConfig = useCallback(() => {
@@ -358,6 +376,19 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
 
   const t = props.t
   const sep = ` ${t('ocgo.sep')} `
+  const period = pricePeriod(selected, new Date(clock))
+  const periodLabel = period ? t(period === 'off-peak' ? 'ocgo.offPeak' : 'ocgo.peak') : undefined
+  const periodTitle = periodLabel ? `${periodLabel} — ${t('ocgo.utcSchedule')}` : ''
+  const periodColor = period === 'off-peak' ? css.offPeak : css.peak
+  const logo = <span className={css.logoMark}>
+    <OcgoLogo />
+    {period && <span className={`${css.periodDot} ${periodColor}`} data-testid="price-period-dot" data-period={period} title={periodTitle} aria-hidden="true" />}
+  </span>
+  const periodBadge = periodLabel ? <span className={`${css.periodLabel} ${periodColor}`} data-testid="price-period-label">{periodLabel}</span> : null
+  const periodDetails = periodLabel ? <span className={css.periodDetails} data-testid="price-period-details">
+    <strong className={periodColor}>{periodLabel}</strong><span>{t('ocgo.utcSchedule')}</span>
+  </span> : null
+
 
   // Hidden whenever the live provider is not opencode-go — the pi-ocgo-usage
   // behaviour: switching to e.g. DeepSeek official hides the chip within one
@@ -378,13 +409,14 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
           type="button"
           className={open ? `${css.chip} ${css.chipOpen}` : css.chip}
           onClick={() => { if (open) closePanel(); else openSet() }}
-          aria-label={`${error.message} — ${t('ocgo.set')}`}
-          title={`${error.message}\n${t('ocgo.set')}`}
+          aria-label={`${error.message} — ${t('ocgo.set')}${periodLabel ? ` — ${periodLabel}` : ''}`}
+          title={`${error.message}\n${t('ocgo.set')}\n${periodTitle}`}
         >
-          <OcgoLogo /> <span className={css.summary}>&lt;err:{error.code}&gt;</span>
+          {logo}{periodBadge} <span className={css.summary}>&lt;err:{error.code}&gt;</span>
         </button>
         {open && (
           <span className={css.details}>
+            {periodDetails}
             <span className={css.setPanel} aria-busy={saving}>
               <label className={css.field}>
                 <span className={css.fieldLabel}>{t('ocgo.workspaceID')}</span>
@@ -444,11 +476,11 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
         type="button"
         className={css.chip}
         onClick={refresh}
-        title={t('ocgo.refresh')}
-        aria-label={t('ocgo.unavailable')}
+        title={`${t('ocgo.refresh')}\n${periodTitle}`}
+        aria-label={`${t('ocgo.unavailable')}${periodLabel ? ` — ${periodLabel}` : ''}`}
         data-testid="ocgo-chip-empty"
       >
-        <OcgoLogo /> <span className={css.summary}>{t('ocgo.unavailable')}</span>
+        {logo}{periodBadge} <span className={css.summary}>{t('ocgo.unavailable')}</span>
       </button>
     )
   }
@@ -459,10 +491,10 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
         type="button"
         className={open ? `${css.chip} ${css.chipOpen}` : css.chip}
         onClick={() => { if (open) closePanel(); else setOpen(true) }}
-        aria-label={windows.map((w) => `${WINDOW_LABELS[w.kind]} ${w.percent}%`).join(', ')}
-        title={open ? t('ocgo.collapse') : t('ocgo.expand')}
+        aria-label={[...windows.map((w) => `${WINDOW_LABELS[w.kind]} ${w.percent}%`), ...(periodLabel ? [periodLabel] : [])].join(', ')}
+        title={`${open ? t('ocgo.collapse') : t('ocgo.expand')}\n${periodTitle}`}
       >
-        <OcgoLogo />
+        {logo}{periodBadge}
         {windows.map((w) => (
           <WindowSegment key={w.kind} window={w} sep={sep} compact />
         ))}
@@ -474,6 +506,7 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
       </button>
       {open && (
         <span className={css.details}>
+            {periodDetails}
           {mode === 'set' ? (
             <span className={css.setPanel} aria-busy={saving}>
               <label className={css.field}>

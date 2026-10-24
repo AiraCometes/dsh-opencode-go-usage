@@ -19,6 +19,7 @@ OpenCode Go: 5h 0% (1h 23m) · wk 65% (2d 20h) · mo 83% (6d 21h) · upd 20:15
 
 ## Features
 
+- **UTC pricing period** — Peak / Off-Peak for selected OpenCode Go DeepSeek V4.1 Flash and V4 Pro models; compact toolbars keep a colored dot, with the UTC rule available in the tooltip and expanded details. See [pricing schedule](docs/price-period.md).
 - **Three windows** — rolling (5h) / weekly / monthly percent + reset countdown
 - **Color thresholds** — muted → warning (≥80%) → error (≥90% or rate-limited)
 - **Data freshness** — `upd HH:MM` shows the last successful fetch time
@@ -58,8 +59,8 @@ npm does not change the plugin installation command.
 ### From a tarball
 
 ```sh
-pnpm pack            # in this repo → dsh-ocgo-usage-0.1.4-rc.2.3.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.4-rc.2.3.tgz
+pnpm pack            # in this repo → dsh-ocgo-usage-0.1.5-rc.2.0.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.5-rc.2.0.tgz
 ```
 
 ### From a local checkout (development)
