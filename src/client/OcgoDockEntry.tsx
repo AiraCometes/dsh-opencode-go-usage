@@ -23,11 +23,23 @@ const POLL_MS = 10_000
 /** The masked-prefix shown before the last-4 tail of a secret. */
 const MASK = '••••'
 
+/** A structured host error, without reflecting the server response message. */
+class OcgoRequestError extends Error {
+  constructor(readonly status: number, readonly code?: string) {
+    super(`ocgo-usage request failed: ${status}`)
+  }
+}
+
 /** Same-origin JSON fetch helper. */
 async function ocgoFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init)
   if (!response.ok) {
-    throw new Error(`ocgo-usage ${path} failed: ${response.status}`)
+    let code: string | undefined
+    try {
+      const body = await response.json() as { code?: unknown } | null
+      if (body?.code === 'invalid-console-cookie') code = body.code
+    } catch { /* Non-JSON failures use the generic save message. */ }
+    throw new OcgoRequestError(response.status, code)
   }
   return (await response.json()) as T
 }
@@ -152,7 +164,7 @@ function WindowSegment(props: { window: UsageWindow; sep: string; compact?: bool
       <span className={css.segSep}>{sep}</span>
       <span className={cls ?? undefined}>
         {WINDOW_LABELS[window.kind]} {window.percent}%
-        {!compact ? ` (${formatDuration(window.resetInSec)})` : ''}
+        {!compact && window.resetInSec !== undefined ? ` (${formatDuration(window.resetInSec)})` : ''}
       </span>
     </span>
   )
@@ -178,6 +190,9 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
   const [config, setConfig] = useState<MaskedConfigView | null>(null)
   const [wsDraft, setWsDraft] = useState('')
   const [cookieDraft, setCookieDraft] = useState('')
+  const [saveError, setSaveError] = useState<OcgoKey | null>(null)
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const wrapRef = useRef<HTMLSpanElement>(null)
   const modeRef = useRef<'view' | 'set'>('view')
   modeRef.current = mode
@@ -242,8 +257,8 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
     })
   }, [])
 
-  /** Submit any edited field; returns the write promise (fire-and-forget on blur). */
-  const saveConfig = useCallback((): void => {
+  /** Return a localized error key, or null after success / an unchanged draft. */
+  const saveConfig = useCallback(async (): Promise<OcgoKey | null> => {
     const current = configRef.current
     const partial: { cookie?: string; workspaceID?: string } = {}
     if (current !== null) {
@@ -256,27 +271,57 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
       if (draftsRef.current.ws.trim().length > 0) partial.workspaceID = draftsRef.current.ws.trim()
       if (draftsRef.current.cookie.trim().length > 0) partial.cookie = draftsRef.current.cookie.trim()
     }
-    if (Object.keys(partial).length === 0) return
-    ocgoApi.writeConfig(partial).then((snapshot) => {
+    if (Object.keys(partial).length === 0) return null
+    try {
+      const snapshot = await ocgoApi.writeConfig(partial)
       setConfig(snapshot)
       setWsDraft(maskedText(snapshot.workspaceID))
       setCookieDraft(maskedText(snapshot.cookie))
       // New credentials are live now (host invalidated its cache): poll now.
       pollNow()
-    }, () => {
-      // Ignore; the next poll resyncs and the editor keeps the drafts.
-    })
+      return null
+    } catch (error) {
+      return error instanceof OcgoRequestError && error.status === 400 && error.code === 'invalid-console-cookie'
+        ? 'ocgo.saveFailedCookie' : 'ocgo.saveFailed'
+    }
   }, [pollNow])
 
   /** Close the panel; in set mode a blur/close acts as confirm (save). */
   const closePanel = useCallback((): void => {
-    if (modeRef.current === 'set') saveConfig()
+    if (savingRef.current) return
+    if (modeRef.current !== 'set') {
+      setOpen(false)
+      return
+    }
+    savingRef.current = true
+    setSaving(true)
+    setSaveError(null)
+    void saveConfig().then((error) => {
+      if (error === null) {
+        setOpen(false)
+        setMode('view')
+      } else {
+        setSaveError(error)
+      }
+    }).finally(() => {
+      savingRef.current = false
+      setSaving(false)
+    })
+  }, [saveConfig])
+
+  /** Explicitly discard the draft without sending any write request. */
+  const cancelPanel = useCallback((): void => {
+    if (savingRef.current) return
+    setWsDraft(maskedText(configRef.current?.workspaceID))
+    setCookieDraft(maskedText(configRef.current?.cookie))
+    setSaveError(null)
     setOpen(false)
     setMode('view')
-  }, [saveConfig])
+  }, [])
 
   /** Open the editor (used by the Set button and the error chip). */
   const openSet = useCallback((): void => {
+    setSaveError(null)
     setMode('set')
     setOpen(true)
     loadConfig()
@@ -340,16 +385,17 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
         </button>
         {open && (
           <span className={css.details}>
-            <span className={css.setPanel}>
+            <span className={css.setPanel} aria-busy={saving}>
               <label className={css.field}>
                 <span className={css.fieldLabel}>{t('ocgo.workspaceID')}</span>
                 <input
                   className={css.fieldInput}
                   value={wsDraft}
-                  placeholder="wrk_…"
+                  disabled={saving}
+                  placeholder="org_…"
                   spellCheck={false}
                   autoComplete="off"
-                  onChange={(e) => { setWsDraft(e.target.value) }}
+                  onChange={(e) => { setWsDraft(e.target.value); setSaveError(null) }}
                   onFocus={(e) => { if (e.target.value === maskedText(config?.workspaceID)) e.target.select() }}
                 />
               </label>
@@ -358,16 +404,21 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
                 <input
                   className={css.fieldInput}
                   value={cookieDraft}
-                  placeholder="auth=…"
+                  disabled={saving}
+                  placeholder="__Host-console_session=…"
                   spellCheck={false}
                   autoComplete="off"
-                  onChange={(e) => { setCookieDraft(e.target.value) }}
+                  onChange={(e) => { setCookieDraft(e.target.value); setSaveError(null) }}
                   onFocus={(e) => { if (e.target.value === maskedText(config?.cookie)) e.target.select() }}
                 />
               </label>
+              {saveError !== null && <span role="alert" className={css.errorText}>{t(saveError)}</span>}
               <span className={css.foot}>
                 <span className={css.setHint}>{t('ocgo.setHint')}</span>
-                <button type="button" className={css.refreshBtn} onClick={closePanel}>
+                <button type="button" className={css.refreshBtn} onClick={cancelPanel} disabled={saving}>
+                  {t('ocgo.cancel')}
+                </button>
+                <button type="button" className={css.refreshBtn} onClick={closePanel} disabled={saving}>
                   {t('ocgo.save')}
                 </button>
               </span>
@@ -424,16 +475,17 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
       {open && (
         <span className={css.details}>
           {mode === 'set' ? (
-            <span className={css.setPanel}>
+            <span className={css.setPanel} aria-busy={saving}>
               <label className={css.field}>
                 <span className={css.fieldLabel}>{t('ocgo.workspaceID')}</span>
                 <input
                   className={css.fieldInput}
                   value={wsDraft}
-                  placeholder="wrk_…"
+                  disabled={saving}
+                  placeholder="org_…"
                   spellCheck={false}
                   autoComplete="off"
-                  onChange={(e) => { setWsDraft(e.target.value) }}
+                  onChange={(e) => { setWsDraft(e.target.value); setSaveError(null) }}
                   onFocus={(e) => { if (e.target.value === maskedText(config?.workspaceID)) e.target.select() }}
                 />
               </label>
@@ -442,16 +494,21 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
                 <input
                   className={css.fieldInput}
                   value={cookieDraft}
-                  placeholder="auth=…"
+                  disabled={saving}
+                  placeholder="__Host-console_session=…"
                   spellCheck={false}
                   autoComplete="off"
-                  onChange={(e) => { setCookieDraft(e.target.value) }}
+                  onChange={(e) => { setCookieDraft(e.target.value); setSaveError(null) }}
                   onFocus={(e) => { if (e.target.value === maskedText(config?.cookie)) e.target.select() }}
                 />
               </label>
+              {saveError !== null && <span role="alert" className={css.errorText}>{t(saveError)}</span>}
               <span className={css.foot}>
                 <span className={css.setHint}>{t('ocgo.setHint')}</span>
-                <button type="button" className={css.refreshBtn} onClick={closePanel}>
+                <button type="button" className={css.refreshBtn} onClick={cancelPanel} disabled={saving}>
+                  {t('ocgo.cancel')}
+                </button>
+                <button type="button" className={css.refreshBtn} onClick={closePanel} disabled={saving}>
                   {t('ocgo.save')}
                 </button>
               </span>
@@ -465,9 +522,9 @@ export function OcgoDockEntry(props: OcgoDockEntryProps): React.ReactElement | n
                   </span>
                   <span className={css.windowValue}>
                     <span className={severityClass(w) ?? undefined}>{w.percent}%</span>
-                    <span className={css.windowReset}>
+                    {w.resetInSec === undefined ? null : <span className={css.windowReset}>
                       {t('ocgo.resetsIn', { duration: formatDuration(w.resetInSec) })}
-                    </span>
+                    </span>}
                   </span>
                 </span>
               ))}

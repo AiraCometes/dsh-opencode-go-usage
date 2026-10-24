@@ -9,7 +9,7 @@
 
 ![Footer demo](assets/custom-footer.png)
 
-一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) **bundle**，在 Web 界面的输入框工具栏（窄工具栏中仅显示 Logo）显示 [OpenCode Go](https://opencode.ai/docs/go/) 订阅用量。
+一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) **bundle**，在 Web 界面的输入框工具栏（窄工具栏中仅显示 Logo）显示 [OpenCode Go](https://dev.opencode.ai/v2/docs/console/go) 订阅用量。
 
 它是 [pi-ocgo-usage](https://github.com/v587d/pi-ocgo-usage)（Pi 插件）的 Web 对应物：三个用量窗口（5h 滚动 / 每周 / 每月）的百分比与重置倒计时，按阈值变色，让你在窗口耗尽、请求被限流之前就发现。
 
@@ -29,7 +29,7 @@ OpenCode Go: 5h 0% (1h 23m) · wk 65% (2d 20h) · mo 83% (6d 21h) · upd 20:15
 - **优雅降级** —— 配置缺失显示 `<err:noconfig>`，HTTP 失败显示 `<err:httpXXX>`；出错时点击 chip 直接进入 Set 面板
 - **Cookie 只在 host 侧** —— 浏览器只访问同源 `/api/ocgo-usage` JSON 端点，cookie 永不进入页面
 
-> **⚠️ 需要 OpenCode Go 会话 cookie。** 该 cookie 是完整用户会话（不是 API key），可访问你 OpenCode 账户的全部内容。请像对待密码一样对待它——见 [配置](#配置)。
+> **⚠️ 需要 OpenCode Console 的 `__Host-console_session` cookie。** 该 cookie 是完整用户会话（不是 API key），可访问你 OpenCode 账户的全部内容。请像对待密码一样对待它——见 [配置](#配置)。
 
 ## 环境要求
 
@@ -57,8 +57,8 @@ dsh plugin --profile web add 'github:AiraCometes/dsh-opencode-go-usage#main'
 ### 从 tarball 安装
 
 ```sh
-pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.3-rc.2.1.tgz
-dsh plugin --profile web add ./dsh-ocgo-usage-0.1.3-rc.2.1.tgz
+pnpm pack            # 在本仓库内 → dsh-ocgo-usage-0.1.4-rc.2.3.tgz
+dsh plugin --profile web add ./dsh-ocgo-usage-0.1.4-rc.2.3.tgz
 ```
 
 ### 本地开发安装
@@ -79,17 +79,26 @@ dsh --profile web --dump-config   # 应显示 "# == dsh-ocgo-usage" 层
 
 ## 配置
 
+### Console 凭据
+
+1. 登录 `https://opencode.ai/console`，打开工作区的 Go 页面。
+2. 从 URL 复制 `org_…`（或现有 `wrk_…`）ID，保留原来的前缀，只填 ID，不要填完整 URL。
+3. 在浏览器开发者工具的 Application → Cookies → `https://opencode.ai` 中复制 `__Host-console_session`，粘贴为 `__Host-console_session=<值>`（也接受直接粘贴 Console 会话值）。
+4. 旧 `auth=<值>` 与 Console 是不同的会话，必须重新获取，不能只改名称。不要将真实 cookie 发到 Issue 或聊天中。
+
+配置字段仍叫 `workspaceID`，现在接受组织 ID。无重置时间时不显示倒计时；倒计时只使用用量窗口明确返回的重置时间，不把订阅结束时间当作月度重置时间。
+
 ### 方式一：界面内 Set 面板（最简单）
 
-点击 chip 展开详情 → 左下角 `Set` → 输入 workspace id 与 cookie（已设置的值以 `••••` + 末尾 4 位显示，聚焦即可输入新值）→ 点击外部 / Esc / 保存按钮确认，立即生效。
+点击 chip 展开详情 → 左下角 `Set` → 输入 workspace id 与 cookie（已设置的值以 `••••` + 末尾 4 位显示，聚焦即可输入新值）→ 点击外部 / Esc / 保存按钮确认；保存成功后立即生效。保存失败时保留面板和输入内容并显示错误，可重试或点击取消丢弃更改。只有明确的 Cookie 验证错误才提示更新 Console cookie；其他错误使用连接和设置的通用提示。保存期间输入和取消按钮暂时禁用。
 
 ![Set editor](assets/set-cookie-wid.png)
 
 ### 方式二：环境变量（与 pi-ocgo-usage 同名）
 
 ```sh
-export OPENCODE_GO_COOKIE="auth=Fe26.2*...; oc_locale=en"
-export OPENCODE_GO_WORKSPACE_ID="wrk_01XXXXXXXXXXXXXXXXXXXXXXXX"
+export OPENCODE_GO_COOKIE="__Host-console_session=example-session; oc_locale=en"
+export OPENCODE_GO_WORKSPACE_ID="org_example"
 ```
 
 ### 方式三：配置文件
@@ -98,8 +107,8 @@ export OPENCODE_GO_WORKSPACE_ID="wrk_01XXXXXXXXXXXXXXXXXXXXXXXX"
 
 ```jsonc
 {
-  "cookie": "auth=Fe26.2*...; oc_locale=en",
-  "workspaceID": "wrk_01XXXXXXXXXXXXXXXXXXXXXXXX"
+  "cookie": "__Host-console_session=example-session; oc_locale=en",
+  "workspaceID": "org_example"
 }
 ```
 
@@ -125,7 +134,7 @@ chmod 600 ~/.dsh/ocgo-usage.json
     enabled: false    # 总开关，默认 true
 ```
 
-> **Cookie 过期：** `auth` cookie 签发后有效期 1 年。过期（或被吊销）后页面 302 跳转到登录页，chip 显示 `<err:http302>` 而非过期数字。重新登录 opencode.ai 后，通过 Set 面板更新 cookie 即可。
+> **会话过期：** 使用 `org_…` 时 Console 返回 HTTP 401/403，可能需要重新登录并更新 `__Host-console_session`；旧 `wrk_…` 被拒绝时，还应先确认 Console URL 中当前的 ID。旧的 `auth` cookie 不能单独用于 Console，且不会自动跟随重定向。未订阅显示 `<err:nosubscription>`，无效 JSON 或用量字段显示 `<err:parse>`。
 
 ## 使用
 
@@ -135,14 +144,14 @@ chmod 600 ~/.dsh/ocgo-usage.json
 
 ## 工作原理
 
-- **Host 半**（`src/index.ts`、`src/service.ts`、`src/api.ts`、`src/routes.ts`）—— 携带 cookie 抓取 `GET /workspace/<wrk>/go`，解析 SSR 渲染的 `data-slot="usage-item"` 块为每个窗口的 `{percent, resetInSec, status}`，缓存结果，通过同源 JSON 端点 `/api/ocgo-usage`（+ `/api/ocgo-usage/refresh`、`/api/ocgo-usage/config`）提供数据。
+- **Host 半**（`src/index.ts`、`src/service.ts`、`src/api.ts`、`src/routes.ts`）—— 携带 Console 会话 cookie 和 `x-org-id` 请求 `GET /console/api/go/status`，将 `access.meters.fiveHour/week/month` 的微分用量与限额转换为百分比和重置时间，缓存结果，通过同源 JSON 端点 `/api/ocgo-usage`（+ `/api/ocgo-usage/refresh`、`/api/ocgo-usage/config`）提供数据。
 - **浏览器半**（`src/client/`）—— 向 `conversation.input.right` slot 注册 chip，每 10s 轮询 host 端点，按严重级别着色渲染三个窗口；可见性来自 `modelDirectories` 的实时 provider 判断。
 
 浏览器永远看不到 cookie；抓取与解析全部在 host 侧完成。
 
 ## 安全
 
-- `auth` cookie 是**完整的 OpenCode 用户会话**。任何人拿到它都能访问你账户内的所有 workspace、订阅与账单信息。
+- `__Host-console_session` cookie 是**完整的 OpenCode Console 用户会话**。任何人拿到它都能访问你账户内的所有 workspace、订阅与账单信息。
 - 插件**绝不**记录 cookie、不把它放进错误信息、不发送给浏览器。
 - 配置编辑器只把新值写入 `$DSH_HOME/ocgo-usage.json`（chmod 600），浏览器始终只看到 `••••` + 末尾 4 位的掩码视图。
 

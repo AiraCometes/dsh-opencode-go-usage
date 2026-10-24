@@ -60,11 +60,11 @@ export function loadConfig(): OcgoConfig {
   const fileConfig = readFileConfig()
 
   // Cookie: prefer env, fall back to file; normalize so users can paste
-  // either the full header or just the auth value.
+  // either the full header or just the Console session value.
   const cookie = normalizeCookie(pickString(process.env[ENV_COOKIE], asString(fileConfig?.cookie)))
 
   // Workspace ID: prefer env, fall back to file.
-  const workspaceID = pickString(process.env[ENV_WORKSPACE_ID], asString(fileConfig?.workspaceID))
+  const workspaceID = pickString(process.env[ENV_WORKSPACE_ID], asString(fileConfig?.workspaceID))?.trim() || undefined
 
   // baseUrl: prefer env, fall back to file, fall back to default.
   const baseUrl =
@@ -102,10 +102,18 @@ export function maskedConfigView(): MaskedConfigView {
   }
 }
 
+/** Invalid input has an explicit identity for the host API; no secret is included. */
+export class InvalidConsoleCookieError extends Error {
+  constructor() {
+    super('Use the OpenCode Console __Host-console_session cookie; the old auth cookie is insufficient')
+    this.name = 'InvalidConsoleCookieError'
+  }
+}
+
 /**
  * Write cookie / workspaceID into the config file (preserving any other
  * fields), chmod 600, and return the updated masked view. Values are
- * normalized like env input (cookie gets `auth=` prefixed when pasted bare).
+ * normalized like env input (bare cookie gets `__Host-console_session=` prefixed when pasted bare).
  * Empty/absent fields are left untouched; pass `null` to clear a field.
  */
 export function writeConfigFile(partial: {
@@ -120,17 +128,19 @@ export function writeConfigFile(partial: {
     else delete next.workspaceID
   }
   if (partial.cookie !== undefined) {
-    const v = typeof partial.cookie === 'string' ? normalizeCookie(partial.cookie) : undefined
-    if (v !== undefined && v.length > 0) next.cookie = v
+    const raw = typeof partial.cookie === 'string' ? partial.cookie.trim() : ''
+    const v = normalizeCookie(raw)
+    if (raw.length > 0 && v === undefined) {
+      throw new InvalidConsoleCookieError()
+    }
+    if (v !== undefined) next.cookie = v
     else delete next.cookie
   }
   const path = configFilePath()
   try {
     writeFileSync(path, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })
   } catch {
-    // Fall back to the env/current effective values rather than throwing to
-    // the browser with a partial write.
-    return maskedConfigView()
+    throw new Error('Could not write the usage configuration')
   }
   return {
     workspaceID: maskSecret(typeof next.workspaceID === 'string' ? next.workspaceID : undefined),
@@ -161,61 +171,21 @@ function pickString(envVal: string | undefined, fileVal: string | undefined): st
   return undefined
 }
 
-/**
- * Normalize a user-provided cookie string into a valid `Cookie:` header value
- * for the opencode console HTTP request.
- *
- * Accepts, order-independently:
- *  1. Full header: "auth=Fe26.2*...; oc_locale=zh"   (passthrough)
- *  2. Single bare value: "Fe26.2*..."                (auto-prefix "auth=")
- *  3. Two-segment value+locale: "Fe26.2*...; oc_locale=zh"
- *  4. Locale + auth in any order (incl. `oc_locale=zh` BEFORE `auth=`).
- *
- * The original implementation decided "the first segment is the auth value"
- * whenever the string did not start with `auth=`. That silently corrupted
- * real browser cookies like `oc_locale=zh; desktop_promo_dismissed=1;
- * auth=Fe26.2*...` into `auth=oc_locale=zh; ...` — a fake cookie that
- * opencode.ai rejects with a redirect to the login page.
- *
- * Fixes:
- *  - The `auth=` segment is located anywhere in the string, not assumed to
- *    be first.
- *  - If no `auth=` pair and no bare opaque token is present, `undefined` is
- *    returned so the caller REFUSES to persist a broken cookie rather than
- *    fabricating `auth=<locale>`.
- *  - The `oc_locale` is preserved from the pasted cookie (so a zh user keeps
- *    the Chinese console page, which the parser now supports), defaulting to
- *    `en` when absent. Only a well-formed short locale (e.g. `en`, `zh`, `ja`)
- *    is kept; anything malformed falls back to `en`.
- *  - All other segments (UI prefs like `desktop_promo_dismissed`) are
- *    dropped; only the auth token and the locale are ever sent.
- */
+/** Canonical Console cookie normalization shared by load, save and transport. */
 export function normalizeCookie(input: string | undefined): string | undefined {
-  if (!input) return undefined
-  const trimmed = input.trim()
-  if (!trimmed) return undefined
-
-  const segments = trimmed.split(/[;,]/).map((s) => s.trim()).filter(Boolean)
-
-  // 1) Auth token — order-independent.
-  let auth = segments.find((s) => /^auth=/i.test(s))
-  if (auth === undefined) {
-    // A bare token (no "=") that looks like an opaque auth value.
-    const bare = segments.find((s) => !s.includes('=') && s.length >= 8)
-    if (bare !== undefined) auth = `auth=${bare}`
+  if (!input || /[\r\n]/.test(input)) return undefined
+  const segments = input.trim().split(/[;,]/).map(s => s.trim()).filter(Boolean)
+  const pair = segments.find(s => s.toLowerCase().startsWith('__host-console_session='))
+  let value = pair?.slice(pair.indexOf('=') + 1).trim().replace(/^"|"$/g, '')
+  if (pair === undefined) {
+    // Do not reinterpret explicitly named legacy cookies as Console sessions.
+    value = segments.find(s => !s.includes('=') && s.length >= 8)
   }
-  if (auth === undefined) return undefined
-
-  const authValue = auth.slice(auth.indexOf('=') + 1).trim().replace(/^"|"$/g, '')
-  if (authValue.length === 0) return undefined
-
-  // 2) Locale — preserve the pasted one (the zh parser understands zh pages),
-  //    fall back to `en` when absent or malformed.
-  const localeSeg = segments.find((s) => /^oc_locale=/i.test(s))
-  const rawLocale = localeSeg ? localeSeg.slice(localeSeg.indexOf('=') + 1).trim() : ''
+  if (!value || !/^[\x21\x23-\x2B\x2D-\x3A\x3C-\x5B\x5D-\x7E]+$/.test(value)) return undefined
+  const localePair = segments.find(s => s.toLowerCase().startsWith('oc_locale='))
+  const rawLocale = localePair?.slice(localePair.indexOf('=') + 1) ?? ''
   const locale = /^[A-Za-z]{2,3}$/.test(rawLocale) ? rawLocale.toLowerCase() : 'en'
-
-  return `auth=${authValue}; oc_locale=${locale}`
+  return `__Host-console_session=${value}; oc_locale=${locale}`
 }
 
 function pickNumber(

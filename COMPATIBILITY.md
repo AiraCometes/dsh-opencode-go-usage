@@ -7,7 +7,7 @@ interface, and registers the usage entry through `slots.inject` in
 
 The usage entry remains visible only for an OpenCode Go model. The selected
 provider is read from the live Session model projection on each poll, without
-fetching the model catalog. Cookie and workspace configuration are unchanged.
+fetching the model catalog. Setting names are preserved. Console reads require `__Host-console_session` and an `org_…` or `wrk_…` ID; an old `auth` cookie must be replaced with the actual Console session, not renamed.
 
 With the npm-installed `dsh` command, install the rc.2 revision in WSL:
 
@@ -50,3 +50,9 @@ The earlier alpha.2 layout check used a local Edge fixture with the built browse
 Every package in `dsh.client.inject` is also an exact rc.2 peer dependency, alongside the host webserver and Cordis peer. These requirements let the plugin manager reject a partially upgraded SDK. Do not widen them solely to avoid an installation rejection: rc.3 and 0.2.1 stable must first be validated. Development SDK dependencies remain pinned for reproducible builds.
 
 The repository's release-age exceptions list only exact DeepSeek package versions present in the lockfile. Obsolete alpha/rc pins are removed; no wildcard or global release-age bypass is used.
+
+## Console usage migration
+
+This revision fetches `/console/api/go/status` with the Console session cookie and `x-org-id`. It does not request `/workspace/<id>/go`. Legacy SSR parser exports remain for existing imports only. Percentages are floored integers from `usedMicroCents / limitMicroCents`; calculations use integer arithmetic, without fixed plan prices. Unknown reset deadlines stay absent in both the API response and UI. `access.endsAt` is not used as a monthly reset because it may describe a longer subscription term.
+
+Protocol evidence and test limitations are recorded in [docs/console-api.md](docs/console-api.md).
