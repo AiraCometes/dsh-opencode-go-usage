@@ -5,7 +5,7 @@ import { isOpenCodeGo } from '../provider.ts'
 vi.mock('./OcgoDockEntry.tsx', () => ({ OcgoDockEntry: () => null, formatDuration: () => '' }))
 
 function harness() {
-  const current = new Map<string, { provider: string } | null>()
+  const current = new Map<string, { provider: string; model?: string } | null>()
   let entry: { name: string; inject: (sessionId: string) => OcgoInjected } | undefined
   const register = vi.fn((options) => { entry = options; return () => {} })
   const slotInject = vi.fn((_name, callback) => callback())
@@ -48,6 +48,15 @@ describe('current Harness model directory integration', () => {
     h.current.set('sample', { provider: 'deepseek' })
     expect(await h.entry().inject('example').provider()).toBe('opencode-go')
     expect(await h.entry().inject('sample').provider()).toBe('deepseek')
+  })
+  it('captures provider and model from the same snapshot and tracks model switches', async () => {
+    const h = harness(); h.current.set('example', { provider: 'opencode-go', model: 'deepseek-v4.1-flash' })
+    const entry = h.entry().inject('example')
+    expect(await entry.selection()).toEqual({ provider: 'opencode-go', model: 'deepseek-v4.1-flash' })
+    h.current.set('example', { provider: 'opencode-go', model: 'kimi-k2.7-code' })
+    expect((await entry.selection())?.model).toBe('kimi-k2.7-code')
+    h.current.delete('example')
+    expect(await entry.selection()).toBeUndefined()
   })
   it('handles unset and disposed sessions without throwing', async () => {
     const h = harness(); h.current.set('example', null)

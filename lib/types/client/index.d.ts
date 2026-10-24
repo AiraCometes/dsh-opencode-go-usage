@@ -16,6 +16,7 @@
  * @module dsh-ocgo-usage/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis';
+import type { ModelSelection } from './price-period.ts';
 import { type OcgoKey } from './locales.ts';
 export { OCGO_PROVIDER } from '../provider.ts';
 export { OcgoDockEntry, formatDuration } from './OcgoDockEntry.tsx';
@@ -38,6 +39,8 @@ export interface OcgoInjected {
      * session has no selection yet.
      */
     provider(): Promise<string | undefined>;
+    /** Provider and model captured from the same live snapshot. */
+    selection(): Promise<ModelSelection | undefined>;
 }
 /**
  * Register the usage chip into the input toolbar.

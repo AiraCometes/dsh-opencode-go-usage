@@ -10,11 +10,13 @@
  * @module dsh-ocgo-usage/client/OcgoDockEntry
  */
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
+import { type ModelSelection } from './price-period.ts';
 import { NS } from './locales.ts';
 /** Composed props of the dock entry (runtime + locale + injected session/provider face). */
 export type OcgoDockEntryProps = PropsRuntime<'conversation.input.right'> & PropsLocale<typeof NS> & {
     dockSessionId?: string | undefined;
     provider?: () => Promise<string | undefined>;
+    selection?: () => Promise<ModelSelection | undefined>;
 };
 /**
  * Format a duration (seconds) compactly: 45s / 23m / 5h 23m / 4d 6h.

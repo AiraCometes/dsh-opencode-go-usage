@@ -21,13 +21,14 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   container.remove()
+  vi.restoreAllMocks()
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })
-async function mount(t: (key: string) => string = key => key) {
+async function mount(t: (key: string) => string = key => key, selection?: () => Promise<{ provider: string; model: string } | undefined>) {
   await act(async () => {
     root.render(createElement(OcgoDockEntry, {
-      provider: async () => provider, t,
+      provider: async () => provider, t, selection,
     } as unknown as OcgoDockEntryProps))
   })
 }
@@ -184,5 +185,53 @@ describe('cancel and save error classification', () => {
     expect(message.includes('__Host-console_session')).toBe(cookieHint)
     expect(message).not.toContain('example-private-body')
     expect(message.length).toBeGreaterThan(0)
+  })
+})
+
+
+describe('UTC price period indicator', () => {
+  it('changes at a UTC boundary without another usage request', async () => {
+    vi.setSystemTime(new Date('2026-10-19T00:59:59Z'))
+    await mount(translate, async () => ({ provider: 'opencode-go', model: 'deepseek-v4.1-flash' }))
+    expect(container.querySelector('[data-testid="price-period-dot"]')?.getAttribute('data-period')).toBe('off-peak')
+    const before = vi.mocked(fetch).mock.calls.length
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(container.querySelector('[data-testid="price-period-dot"]')?.getAttribute('data-period')).toBe('peak')
+    expect(container.querySelector('button')?.getAttribute('aria-label')).toContain('Peak')
+    expect(vi.mocked(fetch).mock.calls.length).toBe(before)
+  })
+  it('refreshes the clock after returning to a background tab', async () => {
+    vi.setSystemTime(new Date('2026-10-19T01:00:00Z'))
+    await mount(translate, async () => ({ provider: 'opencode-go', model: 'deepseek-v4-pro' }))
+    vi.setSystemTime(new Date('2026-10-24T01:00:00Z'))
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(container.querySelector('[data-testid="price-period-dot"]')?.getAttribute('data-period')).toBe('off-peak')
+  })
+  it('removes the label when switching to a model without documented time pricing', async () => {
+    vi.setSystemTime(new Date('2026-10-24T01:00:00Z'))
+    let model = 'deepseek-v4.1-flash'
+    await mount(translate, async () => ({ provider: 'opencode-go', model }))
+    expect(container.textContent).toContain('Off-Peak')
+    model = 'kimi-k2.7-code'
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000) })
+    expect(container.querySelector('[data-testid="price-period-dot"]')).toBeNull()
+    expect(container.textContent).not.toContain('Off-Peak')
+  })
+  it.each([{ error: 'noconfig' }, {}])('shows clock pricing even without usage data %j', async view => {
+    vi.setSystemTime(new Date('2026-10-24T01:00:00Z'))
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => view })))
+    await mount(translate, async () => ({ provider: 'opencode-go', model: 'deepseek-v4-pro' }))
+    expect(container.querySelector('[data-testid="price-period-dot"]')?.getAttribute('data-period')).toBe('off-peak')
+    expect(container.querySelector('button')?.getAttribute('aria-label')).toContain('Off-Peak')
+  })
+  it('shows UTC and JST rules in expanded details and the compact tooltip', async () => {
+    vi.setSystemTime(new Date('2026-10-24T01:00:00Z'))
+    await mount(translate, async () => ({ provider: 'opencode-go', model: 'deepseek-v4-pro' }))
+    await act(async () => { container.querySelector('button')!.click() })
+    const details = container.querySelector('[data-testid="price-period-details"]')?.textContent
+    expect(details).toContain('UTC schedule')
+    expect(details).toContain('JST (Japan): Mon–Fri 10:00–13:00 and 15:00–19:00')
+    expect(container.querySelector('button')?.title).toContain('JST (Japan)')
   })
 })

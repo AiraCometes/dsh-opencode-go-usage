@@ -1,0 +1,1 @@
+{"version":3,"file":"price-period.d.ts","sourceRoot":"","sources":["../../../src/client/price-period.ts"],"names":[],"mappings":"AAEA,MAAM,WAAW,cAAc;IAC7B,QAAQ,CAAC,QAAQ,EAAE,MAAM,CAAA;IACzB,QAAQ,CAAC,KAAK,EAAE,MAAM,CAAA;CACvB;AACD,MAAM,MAAM,WAAW,GAAG,MAAM,GAAG,UAAU,CAAA;AAE7C,uFAAuF;AACvF,wBAAgB,WAAW,CAAC,SAAS,EAAE,cAAc,GAAG,SAAS,EAAE,GAAG,EAAE,IAAI,GAAG,WAAW,GAAG,SAAS,CAOrG"}

@@ -13,13 +13,14 @@ assert.equal(bundle.id, 'dsh-ocgo-usage')
 const client = bundle.factory(createRequire(import.meta.url))
 let entry
 let provider = 'opencode-go'
+let model = 'deepseek-v4.1-flash'
 const scope = {
   slots: {
     inject(name, callback) { assert.equal(name, 'conversation.input.right'); return callback() },
     register(options) { entry = options; return () => {} },
   },
   modelDirectories: { directoryFor() {
-    return { store: { getSnapshot: () => ({ current: { provider } }) } }
+    return { store: { getSnapshot: () => ({ current: { provider, model } }) } }
   } },
 }
 client.apply({
@@ -33,6 +34,9 @@ client.apply({
 assert.equal(entry.name, 'conversation.input.right')
 const injected = entry.inject('example')
 assert.equal(await injected.provider(), 'opencode-go')
+assert.equal((await injected.selection()).model, 'deepseek-v4.1-flash')
+model = 'deepseek-v4-pro'
+assert.equal((await injected.selection()).model, 'deepseek-v4-pro')
 provider = 'deepseek'
 assert.equal(await injected.provider(), 'deepseek')
 console.log('Browser bundle factory and live model-directory integration passed')
