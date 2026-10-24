@@ -19,7 +19,7 @@ OpenCode Go: 5h 0% (1h 23m) · wk 65% (2d 20h) · mo 83% (6d 21h) · upd 20:15
 
 ## Features
 
-- **UTC pricing period** — Peak / Off-Peak for selected OpenCode Go DeepSeek V4.1 Flash and V4 Pro models; compact toolbars keep a colored dot, with the UTC rule available in the tooltip and expanded details. See [pricing schedule](docs/price-period.md).
+- **UTC pricing period** — Peak / Off-Peak for selected OpenCode Go DeepSeek V4.1 Flash and V4 Pro models; compact toolbars keep a colored dot, with UTC/JST hours available in the tooltip and expanded details. See [pricing schedule](docs/price-period.md).
 - **Three windows** — rolling (5h) / weekly / monthly percent + reset countdown
 - **Color thresholds** — muted → warning (≥80%) → error (≥90% or rate-limited)
 - **Data freshness** — `upd HH:MM` shows the last successful fetch time

@@ -225,10 +225,13 @@ describe('UTC price period indicator', () => {
     expect(container.querySelector('[data-testid="price-period-dot"]')?.getAttribute('data-period')).toBe('off-peak')
     expect(container.querySelector('button')?.getAttribute('aria-label')).toContain('Off-Peak')
   })
-  it('shows the UTC rule in the expanded details', async () => {
+  it('shows UTC and JST rules in expanded details and the compact tooltip', async () => {
     vi.setSystemTime(new Date('2026-10-24T01:00:00Z'))
     await mount(translate, async () => ({ provider: 'opencode-go', model: 'deepseek-v4-pro' }))
     await act(async () => { container.querySelector('button')!.click() })
-    expect(container.querySelector('[data-testid="price-period-details"]')?.textContent).toContain('UTC schedule')
+    const details = container.querySelector('[data-testid="price-period-details"]')?.textContent
+    expect(details).toContain('UTC schedule')
+    expect(details).toContain('JST (Japan): Mon–Fri 10:00–13:00 and 15:00–19:00')
+    expect(container.querySelector('button')?.title).toContain('JST (Japan)')
   })
 })

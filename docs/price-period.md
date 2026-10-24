@@ -15,7 +15,7 @@ This is a published-schedule indicator, not billing verification. It uses the br
 
 ## Display and verification
 
-Wide toolbars show Peak / Off-Peak text next to the logo. At toolbar widths <=560px, the text is hidden and an absolute-positioned dot stays within the existing logo width. The button's accessible label and tooltip identify the period; expanded details describe the UTC rule. The period can still display while usage credentials or data are unavailable.
+Wide toolbars show Peak / Off-Peak text next to the logo. At toolbar widths <=560px, the text is hidden and an absolute-positioned dot stays within the existing logo width. The button's accessible label and tooltip identify the period; expanded details describe the UTC and JST (Japan) hours. The period can still display while usage credentials or data are unavailable.
 
 Tests cover every start/end boundary, weekends, equivalent UTC/JST timestamps, unsupported models/providers, invalid selections, model switching, minute-boundary updates without usage requests, tab visibility recovery and missing usage data. The pure schedule suite also passed with `TZ=Pacific/Honolulu`.
 

@@ -19,7 +19,7 @@ OpenCode Go: 5h 0% (1h 23m) · wk 65% (2d 20h) · mo 83% (6d 21h) · upd 20:15
 
 ## 特性
 
-- **UTC 价格时段** —— 选择 OpenCode Go 的 DeepSeek V4.1 Flash / V4 Pro 时显示 Peak / Off-Peak；窄工具栏保留圆点，悬停或展开可查看 UTC 规则。见[时段说明](docs/price-period.md)。
+- **UTC 价格时段** —— 选择 OpenCode Go 的 DeepSeek V4.1 Flash / V4 Pro 时显示 Peak / Off-Peak；窄工具栏保留圆点，悬停或展开可查看 UTC / JST 时间。见[时段说明](docs/price-period.md)。
 - **三个窗口** —— 5h 滚动 / 每周 / 每月 的百分比 + 重置倒计时
 - **颜色阈值** —— 正常 → 黄色警告（≥80%）→ 红色错误（≥90% 或已限流）
 - **数据新鲜度** —— `upd HH:MM` 显示最近一次成功抓取时间
